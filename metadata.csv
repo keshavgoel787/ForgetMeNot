@@ -1,0 +1,5 @@
+clip_name,title,description,scene_label,emotion_label,context_tags
+disney_01_beach.mp4,Disney Trip,Walking on the beach with family at sunset,beach,joyful,"['outdoors','family','vacation','sunset']"
+football_01_stadium.mp4,Football Game,Cheering in the stadium with friends,stadium,excited,"['sports','crowd','friends']"
+college_01_classroom.mp4,College Day,Studying and chatting with classmates,classroom,focused,"['learning','school','friends']"
+food_01_restaurant.mp4,Food Trip,Eating lunch at a local restaurant,restaurant,calm,"['food','outdoors','family']"
