@@ -433,48 +433,70 @@ def generate_speech_elevenlabs(text: str, voice_id: str) -> bytes:
 async def text_to_speech(request: TextToSpeechRequest):
     """
     Generate speech from text using a person's voice clone
-    
+
     Request body:
     {
         "text": "Hi, how are you?",
         "name": "Hannah"
     }
-    
-    Returns: MP3 audio file
+
+    Returns: JSON with audio URL
+    {
+        "url": "https://storage.googleapis.com/...",
+        "text": "Hi, how are you?",
+        "voice": "Hannah"
+    }
     """
-    
+
     # Get voice mapping
     voice_mapping = get_elevenlabs_voices()
-    
+
     if not voice_mapping:
         raise HTTPException(
             status_code=500,
             detail="Could not load ElevenLabs voices. Check ELEVENLABS_API_KEY."
         )
-    
+
     # Look up voice ID for this person
     person_name_lower = request.name.lower()
     voice_id = voice_mapping.get(person_name_lower)
-    
+
     if not voice_id:
         available_names = ", ".join(voice_mapping.keys())
         raise HTTPException(
             status_code=404,
             detail=f"Voice not found for '{request.name}'. Available: {available_names}"
         )
-    
+
     # Generate speech
     try:
         audio_content = generate_speech_elevenlabs(request.text, voice_id)
-        
-        # Return as streaming MP3
-        return StreamingResponse(
-            io.BytesIO(audio_content),
-            media_type="audio/mpeg",
-            headers={
-                "Content-Disposition": f"attachment; filename={request.name}_speech.mp3"
-            }
-        )
+
+        # Upload to GCS
+        from google.cloud import storage
+        import time
+
+        bucket_name = os.getenv("GCS_BUCKET", "forgetmenot-videos")
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+
+        # Create unique filename
+        timestamp = int(time.time() * 1000)
+        filename = f"tts_audio/{request.name}_{timestamp}.mp3"
+        blob = bucket.blob(filename)
+
+        # Upload audio
+        blob.upload_from_string(audio_content, content_type="audio/mpeg")
+
+        # Make public and get URL
+        blob.make_public()
+        public_url = blob.public_url
+
+        return {
+            "url": public_url,
+            "text": request.text,
+            "voice": request.name
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
