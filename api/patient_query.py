@@ -25,6 +25,7 @@ from scripts.retrieval_cycle import search_memories_by_query, format_memories_fo
 from scripts.lib.gemini_client import generate_text
 from api.schemas import PatientQueryResponse
 from api.intent_classifier import classify_intent_and_media
+from api.session_manager import session_manager
 import google.generativeai as genai
 
 router = APIRouter(prefix="/patient", tags=["Patient"])
@@ -63,6 +64,26 @@ Provide only the transcription:"""
         return transcription.strip()
     except Exception as e:
         raise Exception(f"Transcription failed: {str(e)}")
+
+
+def filter_unseen_memories(memories: List[tuple], patient_id: str, topic: str) -> List[tuple]:
+    """
+    Filter out memories that have already been shown in this session
+    """
+    shown_ids = session_manager.get_shown_memories(patient_id, topic)
+
+    # Filter out shown memories
+    unseen = []
+    for memory in memories:
+        event_name, file_name, file_type, description, people, event_summary, file_url, similarity = memory
+
+        # Use file_url as unique ID
+        if file_url not in shown_ids:
+            unseen.append(memory)
+
+    print(f"🔍 Filtered: {len(memories)} total → {len(unseen)} unseen (skipped {len(shown_ids)} shown)")
+
+    return unseen
 
 
 def select_media_for_mode(display_mode: str, memories: List[tuple]) -> tuple[str, List[str]]:
@@ -165,7 +186,8 @@ Create a 2-3 sentence narration that:
 @router.post("/query", response_model=PatientQueryResponse)
 async def patient_query(
     audio_file: UploadFile = File(..., description="MP3 audio file from patient"),
-    topic: str = Form(..., description="Topic/person/event (e.g., 'Avery', 'College')")
+    topic: str = Form(..., description="Topic/person/event (e.g., 'Avery', 'College')"),
+    patient_id: str = Form(default="default_patient", description="Patient ID for session tracking")
 ):
     """
     **Patient Query Endpoint** - 6-Mode Classification System
@@ -229,22 +251,34 @@ async def patient_query(
             print(f"🎯 Display Mode: {display_mode}")
 
             # Step 4: Retrieve memories
-            memories = search_memories_by_query(topic, client, top_k=15)
+            all_memories = search_memories_by_query(topic, client, top_k=50)
 
-            if not memories:
+            if not all_memories:
                 raise HTTPException(
                     status_code=404,
                     detail=f"No memories found for topic: {topic}"
                 )
 
+            # Step 4.5: Filter out already-shown memories
+            unseen_memories = filter_unseen_memories(all_memories, patient_id, topic)
+
+            # If all memories have been shown, reset and use all
+            if not unseen_memories:
+                print("♻️  All memories shown - resetting session")
+                session_manager.reset_session(patient_id, topic)
+                unseen_memories = all_memories
+
             # Step 5: Select media based on display mode (adjusts mode if needed)
-            adjusted_mode, media_urls = select_media_for_mode(display_mode, memories)
+            adjusted_mode, media_urls = select_media_for_mode(display_mode, unseen_memories)
             print(f"📸 Adjusted Mode: {adjusted_mode} (from {display_mode}) - {len(media_urls)} media")
+
+            # Step 5.5: Mark selected media as shown
+            session_manager.mark_as_shown(patient_id, topic, media_urls)
 
             # Step 6: Generate narration (if not agent mode)
             narration_text = None
             if adjusted_mode != "agent":
-                memories_context = format_memories_for_gemini(memories[:5])
+                memories_context = format_memories_for_gemini(unseen_memories[:5])
                 narration_text = generate_narration(topic, memories_context, transcription)
                 print(f"💬 Narration: {narration_text}")
 
@@ -268,7 +302,8 @@ async def patient_query(
 @router.post("/query-test", response_model=PatientQueryResponse)
 async def patient_query_test(
     transcription: str = Form(..., description="Test transcription (skip audio upload)"),
-    topic: str = Form(..., description="Topic/person/event")
+    topic: str = Form(..., description="Topic/person/event"),
+    patient_id: str = Form(default="default_patient", description="Patient ID for session tracking")
 ):
     """
     **Test endpoint** - Bypass audio upload, provide transcription directly
@@ -296,22 +331,34 @@ async def patient_query_test(
             print(f"🎯 Display Mode: {display_mode}")
 
             # Retrieve memories
-            memories = search_memories_by_query(topic, client, top_k=15)
+            all_memories = search_memories_by_query(topic, client, top_k=50)
 
-            if not memories:
+            if not all_memories:
                 raise HTTPException(
                     status_code=404,
                     detail=f"No memories found for topic: {topic}"
                 )
 
+            # Filter out already-shown memories
+            unseen_memories = filter_unseen_memories(all_memories, patient_id, topic)
+
+            # If all memories have been shown, reset and use all
+            if not unseen_memories:
+                print("♻️  All memories shown - resetting session")
+                session_manager.reset_session(patient_id, topic)
+                unseen_memories = all_memories
+
             # Select media (adjusts mode if needed)
-            adjusted_mode, media_urls = select_media_for_mode(display_mode, memories)
+            adjusted_mode, media_urls = select_media_for_mode(display_mode, unseen_memories)
             print(f"📸 Adjusted Mode: {adjusted_mode} (from {display_mode}) - {len(media_urls)} media")
+
+            # Mark selected media as shown
+            session_manager.mark_as_shown(patient_id, topic, media_urls)
 
             # Generate narration (if not agent mode)
             narration_text = None
             if adjusted_mode != "agent":
-                memories_context = format_memories_for_gemini(memories[:5])
+                memories_context = format_memories_for_gemini(unseen_memories[:5])
                 narration_text = generate_narration(topic, memories_context, transcription)
                 print(f"💬 Narration: {narration_text}")
 
@@ -378,6 +425,37 @@ async def list_patient_experiences(limit: int = 10):
                 for row in (results or [])
             ]
         }
+
+
+@router.get("/session/stats")
+async def get_session_stats(patient_id: str, topic: str):
+    """
+    **Get session statistics** - How many memories have been shown
+
+    Example:
+    ```
+    GET /patient/session/stats?patient_id=patient_123&topic=disney
+    ```
+    """
+    stats = session_manager.get_session_stats(patient_id, topic)
+    return stats
+
+
+@router.post("/session/reset")
+async def reset_session(patient_id: str, topic: Optional[str] = None):
+    """
+    **Reset session** - Clear shown memories to start fresh
+
+    Example:
+    ```
+    POST /patient/session/reset?patient_id=patient_123&topic=disney
+    ```
+    """
+    session_manager.reset_session(patient_id, topic)
+    return {
+        "status": "success",
+        "message": f"Session reset for patient {patient_id}" + (f" topic {topic}" if topic else " (all topics)")
+    }
 
 
 @router.get("/experience/topic/{topic}")
