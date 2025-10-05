@@ -68,6 +68,8 @@ api_server/pre_processed/
 api_server/post_processed/
 api_server/temp_processing/
 
-# Google Cloud credentials (but allow package.json)
+# Google Cloud credentials (but allow package.json, tsconfig.json, etc.)
 *.json
 !package.json
+!tsconfig*.json
+!*config.json

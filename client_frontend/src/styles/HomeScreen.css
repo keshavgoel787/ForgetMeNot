@@ -1,0 +1,73 @@
+/* Home screen specific styles */
+.orbit-container {
+  position: relative;
+  width: 600px;
+  height: 600px;
+  margin: 40px auto;
+}
+
+.central-circle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+  z-index: 10;
+}
+
+.central-circle img {
+  width: 80px;
+  height: 80px;
+  filter: brightness(0) invert(1);
+}
+
+.orbit-item {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.orbit-item:hover {
+  transform: scale(1.1) !important;
+}
+
+.orbit-circle {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transition: box-shadow 0.3s ease;
+}
+
+.orbit-circle:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+}
+
+.orbit-circle img {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 6px;
+  filter: brightness(0) invert(1);
+}
+
+.orbit-circle-label {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  word-wrap: break-word;
+}

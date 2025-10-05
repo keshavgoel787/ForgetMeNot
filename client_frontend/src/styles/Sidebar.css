@@ -1,0 +1,73 @@
+/* Left navbar */
+.sidebar {
+  min-width: 120px;
+  max-width: 180px;
+  width: auto;
+  padding: 16px 12px;
+  background: #a9bff0;
+  border-right: 1px solid rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand {
+  width: 100%;
+  height: 56px;
+  border-radius: 100px;
+  background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  letter-spacing: 1px;
+  overflow: hidden;
+}
+
+.brand img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 8px;
+  flex: 1;
+}
+
+.nav-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+  flex: 1;
+}
+
+.nav-bottom {
+  margin-top: auto;
+}
+
+.nav-item {
+  all: unset;
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 8px 0;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.4);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.nav-item:hover {
+  background: rgba(255,255,255,0.65);
+}
+
+.nav-item.active {
+  background: rgba(255,255,255,0.85);
+  font-weight: 600;
+}

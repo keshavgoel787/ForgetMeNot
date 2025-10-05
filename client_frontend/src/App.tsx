@@ -1,30 +1,33 @@
-import './App.css'
+import { useState } from 'react';
+import type { Screen } from './types';
+import Sidebar from './components/Sidebar';
+import HomeScreen from './components/HomeScreen';
+import RememberScreen from './components/RememberScreen';
+import MyMemoriesScreen from './components/MyMemoriesScreen';
+import './styles/App.css';
 
 function App() {
+  const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
+
+  const renderCurrentScreen = () => {
+    switch (currentScreen) {
+      case 'dashboard':
+        return <HomeScreen />;
+      case 'remember':
+        return <RememberScreen />;
+      case 'My_Memories':
+        return <MyMemoriesScreen />;
+      default:
+        return <HomeScreen />;
+    }
+  };
+
   return (
     <div className="app">
-      <aside className="sidebar">
-        <div className="brand">RU</div>
-        <nav className="nav">
-          <button className="nav-item">Home</button>
-          <button className="nav-item">Projects</button>
-          <button className="nav-item">Settings</button>
-        </nav>
-      </aside>
-      <main className="main">
-        <div className="cards">
-          <div className="card">
-            <h2>Card One</h2>
-            <p>This is the first card with some placeholder content. You can add your Google Gemini API integration here.</p>
-          </div>
-          <div className="card">
-            <h2>Card Two</h2>
-            <p>This is the second card where you can add more functionality for your hackathon project.</p>
-          </div>
-        </div>
-      </main>
+      <Sidebar currentScreen={currentScreen} onScreenChange={setCurrentScreen} />
+      <main className="main">{renderCurrentScreen()}</main>
     </div>
-  )
+  );
 }
 
 export default App
