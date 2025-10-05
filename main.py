@@ -12,6 +12,7 @@ import logging
 from api.experiences import router as therapist_router
 from api.patient_query import router as patient_router
 from api.patient_query_optimized import router as patient_fast_router
+from api.agent_conversation import router as agent_router
 from api.metadata import router as admin_metadata_router
 from api.upload import router as admin_upload_router
 
@@ -72,10 +73,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers - Organized by Therapist → Admin → Patient
+# Include routers - Organized by Therapist → Admin → Patient → Agent
 app.include_router(therapist_router)
 app.include_router(patient_router)
 app.include_router(patient_fast_router)  # Optimized endpoints
+app.include_router(agent_router)  # Agent conversation (Avery)
 app.include_router(admin_metadata_router)
 app.include_router(admin_upload_router)
 
@@ -87,7 +89,7 @@ async def root():
         "status": "running",
         "service": "ReMind - AI Companion for Alzheimer's Care",
         "version": "2.0.0",
-        "architecture": "Therapist → Admin → Patient",
+        "architecture": "Therapist → Admin → Patient → Agent",
         "endpoints": {
             "therapist": {
                 "create_experience": "POST /therapist/create-experience - Create memory experience for patient",
@@ -101,6 +103,10 @@ async def root():
                 "list_experiences": "GET /patient/experiences - List available experiences",
                 "get_by_topic": "GET /patient/experience/topic/{topic} - Get experience by topic (random non-agent display)"
             },
+            "agent": {
+                "talk": "POST /agent/talk - Converse with Avery (AI companion with personality & voice)",
+                "profile": "GET /agent/profile/{agent_name} - Get agent profile and personality"
+            },
             "admin": {
                 "build_metadata": "POST /admin/metadata/build - Build metadata from GCS",
                 "upload_snowflake": "POST /admin/upload/snowflake - Upload to Snowflake",
@@ -108,5 +114,5 @@ async def root():
             },
             "docs": "/docs - Interactive API documentation"
         },
-        "flow": "Therapist creates experience → Patient views & interacts → Admin manages data"
+        "flow": "Therapist creates experience → Patient views & interacts → Agent conversation (Avery) → Admin manages data"
     }
