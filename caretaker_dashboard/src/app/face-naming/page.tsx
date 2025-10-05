@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { extractFaces, generateContext, parseExtractedFacesZip, downloadBlob } from '@/lib/api-client';
+import { Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface Folder {
   name: string;
@@ -10,7 +12,10 @@ interface Folder {
   previewImage: string | null;
   imageCount: number;
   images: string[];
+  imageUrls: string[];
 }
+
+type ProcessingStage = 'upload' | 'extracting' | 'naming' | 'generating' | 'complete' | 'error';
 
 interface Bubble {
   id: string;
@@ -43,45 +48,74 @@ export default function FaceNamingPage() {
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  
+  // API Integration State
+  const [processingStage, setProcessingStage] = useState<ProcessingStage>('upload');
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [extractedZipBlob, setExtractedZipBlob] = useState<Blob | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [processingProgress, setProcessingProgress] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load existing named faces
-  useEffect(() => {
-    async function loadNamedFaces() {
-      try {
-        const res = await fetch('/data/named-faces.json');
-        const data = await res.json();
-        setSavedNames(data);
-      } catch (error) {
-        console.error('Error loading named faces:', error);
-      }
+  // Handle file upload
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.name.endsWith('.zip')) {
+      setUploadedFile(file);
+      setErrorMessage('');
+    } else {
+      setErrorMessage('Please upload a ZIP file containing your memories folder');
     }
-    loadNamedFaces();
-  }, []);
+  };
 
-  // Fetch folders
-  useEffect(() => {
-    async function fetchFolders() {
-      try {
-        const res = await fetch('/api/people');
-        const data = await res.json();
-        if (data.folders) {
-          setFolders(data.folders);
-        }
-      } catch (error) {
-        console.log('API not available, using mock data for testing');
-        // Mock data for testing when API is unavailable
-        setFolders([]);
-      }
+  // Step 1: Extract faces from uploaded ZIP
+  const handleExtractFaces = async () => {
+    if (!uploadedFile) {
+      setErrorMessage('Please upload a ZIP file first');
+      return;
     }
-    fetchFolders();
-  }, []);
+
+    setProcessingStage('extracting');
+    setProcessingProgress('Uploading and extracting faces... (using mock data)');
+    setErrorMessage('');
+
+    try {
+      // Call extract-faces API (will use mock data if API unavailable)
+      const zipBlob = await extractFaces(uploadedFile);
+      setExtractedZipBlob(zipBlob);
+      
+      setProcessingProgress('Parsing extracted faces...');
+      
+      // Parse the ZIP to get folder structure
+      const { folders: extractedFolders } = await parseExtractedFacesZip(zipBlob);
+      
+      // Convert to Folder format
+      const formattedFolders: Folder[] = extractedFolders.map(folder => ({
+        name: folder.name,
+        path: folder.name,
+        previewImage: folder.imageUrls[0] || null,
+        imageCount: folder.images.length,
+        images: folder.images,
+        imageUrls: folder.imageUrls,
+      }));
+      
+      setFolders(formattedFolders);
+      setProcessingStage('naming');
+      setProcessingProgress('');
+      setCurrentFolderIndex(0);
+    } catch (error: any) {
+      console.error('Error extracting faces:', error);
+      setErrorMessage(error.message || 'Failed to extract faces. Please try again.');
+      setProcessingStage('error');
+    }
+  };
 
   // Initialize bubbles when folder changes
   useEffect(() => {
-    if (folders.length > 0 && currentFolderIndex < folders.length) {
+    if (folders.length > 0 && currentFolderIndex < folders.length && processingStage === 'naming') {
       const currentFolder = folders[currentFolderIndex];
-      const newBubbles: Bubble[] = currentFolder.images.map((image, index) => {
-        const angle = (index / currentFolder.images.length) * Math.PI * 2;
+      const newBubbles: Bubble[] = currentFolder.imageUrls.map((imageUrl, index) => {
+        const angle = (index / currentFolder.imageUrls.length) * Math.PI * 2;
         const radius = 200;
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
@@ -95,7 +129,7 @@ export default function FaceNamingPage() {
           vx: (Math.random() - 0.5) * 2,
           vy: (Math.random() - 0.5) * 2,
           size: 80 + Math.random() * 40,
-          image: `/${currentFolder.path}/${image}`,
+          image: imageUrl,
           name: '',
           originalX: x,
           originalY: y,
@@ -105,7 +139,7 @@ export default function FaceNamingPage() {
       });
       setBubbles(newBubbles);
     }
-  }, [folders, currentFolderIndex]);
+  }, [folders, currentFolderIndex, processingStage]);
 
   // Track mouse position with useRef (no re-renders)
   useEffect(() => {
@@ -119,7 +153,7 @@ export default function FaceNamingPage() {
 
   // Optimized physics with requestAnimationFrame
   useEffect(() => {
-    if (bubbles.length === 0) return;
+    if (bubbles.length === 0 || processingStage !== 'naming') return;
     
     const repelRadius = 150;
     const repelRadiusSq = repelRadius * repelRadius; // Avoid sqrt when possible
@@ -201,44 +235,37 @@ export default function FaceNamingPage() {
   };
 
   const handleSaveFinal = async () => {
-    // Convert assignments to the format expected by the API
-    const output: { [key: string]: string } = {};
-    
-    Object.entries(allAssignments).forEach(([folderName, personName]) => {
-      if (personName && personName.trim()) {
-        if (!output[personName]) {
-          output[personName] = '';
-        }
-        output[personName] += (output[personName] ? ',' : '') + folderName;
-      }
-    });
+    if (!uploadedFile) {
+      setErrorMessage('Original data file is missing');
+      return;
+    }
+
+    setProcessingStage('generating');
+    setProcessingProgress('Generating context with AI... (using mock data)');
+    setShowSummary(false);
+    setErrorMessage('');
 
     try {
-      const response = await fetch('/api/save-faces', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(output),
-      });
-
-      if (response.ok) {
-        alert('All names saved successfully! 🎉');
-        // Reset to start
-        setShowSummary(false);
-        setAllAssignments({});
-        setCurrentFolderIndex(0);
-      } else {
-        alert('Error saving names.');
-      }
-    } catch (error) {
-      console.error('API not available:', error);
-      // Allow testing without API - just show success
-      console.log('Would have saved:', output);
-      alert('✅ Testing mode: Names logged to console (API disabled)');
-      setShowSummary(false);
-      setAllAssignments({});
-      setCurrentFolderIndex(0);
+      // Call generate-context API with names mapping (will use mock data if API unavailable)
+      const contextZipBlob = await generateContext(uploadedFile, allAssignments);
+      
+      setProcessingProgress('Complete! Downloading results...');
+      
+      // Download the complete annotated ZIP
+      downloadBlob(contextZipBlob, 'annotated_memories.zip');
+      
+      setProcessingStage('complete');
+      setProcessingProgress('');
+      
+      // Show success message
+      setTimeout(() => {
+        alert('✅ Processing complete! Your annotated memories have been downloaded.\n\n(Demo mode: Mock data was used)');
+      }, 500);
+    } catch (error: any) {
+      console.error('Error generating context:', error);
+      setErrorMessage(error.message || 'Failed to generate context. Please try again.');
+      setProcessingStage('error');
+      setShowSummary(true); // Go back to summary
     }
   };
 
@@ -255,6 +282,127 @@ export default function FaceNamingPage() {
   };
 
   const currentFolder = folders[currentFolderIndex];
+
+  // Upload Screen
+  if (processingStage === 'upload' || processingStage === 'error') {
+    return (
+      <div className="min-h-screen w-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-6">
+        <div className="max-w-2xl w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 shadow-2xl">
+          <div className="text-center mb-8">
+            <h1 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-purple-300 to-pink-300 mb-4">
+              Face Naming Wizard
+            </h1>
+            <p className="text-white/80 text-lg">
+              Upload your memories ZIP file to extract and name faces
+            </p>
+          </div>
+
+          {errorMessage && (
+            <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-300 flex-shrink-0 mt-0.5" />
+              <p className="text-red-200 text-sm">{errorMessage}</p>
+            </div>
+          )}
+
+          <div className="space-y-6">
+            <div className="border-2 border-dashed border-white/30 rounded-2xl p-12 text-center hover:border-purple-400 transition-all cursor-pointer bg-white/5"
+                 onClick={() => fileInputRef.current?.click()}>
+              <Upload className="w-16 h-16 mx-auto mb-4 text-purple-300" />
+              <p className="text-white text-lg font-semibold mb-2">
+                {uploadedFile ? uploadedFile.name : 'Click to upload ZIP file'}
+              </p>
+              <p className="text-white/60 text-sm">
+                ZIP should contain a 'memories' folder with photos/videos
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".zip"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </div>
+
+            <Button
+              onClick={handleExtractFaces}
+              disabled={!uploadedFile}
+              className="w-full h-16 text-xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Extract Faces
+            </Button>
+          </div>
+
+          <div className="mt-8 p-4 bg-white/5 rounded-lg border border-white/10">
+            <p className="text-white/70 text-sm">
+              <strong className="text-white">How it works:</strong><br />
+              1. Upload your memories ZIP file<br />
+              2. AI extracts and clusters faces<br />
+              3. Name each person<br />
+              4. Generate context with AI<br />
+              5. Download annotated memories
+            </p>
+          </div>
+
+          <div className="mt-4 p-4 bg-blue-500/20 border border-blue-500/50 rounded-lg">
+            <p className="text-blue-200 text-sm">
+              <strong className="text-blue-100">ℹ️ Demo Mode:</strong><br />
+              API is currently disabled. The app will use mock data for demonstration purposes.
+              To enable real API calls, set <code className="bg-black/30 px-1 rounded">USE_MOCK_DATA = false</code> in <code className="bg-black/30 px-1 rounded">api-client.ts</code>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Extracting/Processing Screen
+  if (processingStage === 'extracting' || processingStage === 'generating') {
+    return (
+      <div className="min-h-screen w-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-6">
+        <div className="max-w-2xl w-full bg-white/10 backdrop-blur-lg rounded-3xl p-12 border border-white/20 shadow-2xl text-center">
+          <Loader2 className="w-20 h-20 mx-auto mb-6 text-purple-300 animate-spin" />
+          <h2 className="text-4xl font-bold text-white mb-4">
+            {processingStage === 'extracting' ? 'Extracting Faces...' : 'Generating Context...'}
+          </h2>
+          <p className="text-white/70 text-lg mb-8">{processingProgress}</p>
+          <div className="w-full bg-white/10 rounded-full h-3 overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-purple-500 to-pink-500 animate-pulse" style={{ width: '100%' }}></div>
+          </div>
+          <p className="text-white/50 text-sm mt-6">This may take a few minutes...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Complete Screen
+  if (processingStage === 'complete') {
+    return (
+      <div className="min-h-screen w-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-6">
+        <div className="max-w-2xl w-full bg-white/10 backdrop-blur-lg rounded-3xl p-12 border border-white/20 shadow-2xl text-center">
+          <CheckCircle className="w-24 h-24 mx-auto mb-6 text-green-400" />
+          <h2 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-300 to-emerald-300 mb-4">
+            All Done! 🎉
+          </h2>
+          <p className="text-white/80 text-lg mb-8">
+            Your annotated memories have been downloaded successfully.
+          </p>
+          <Button
+            onClick={() => {
+              setProcessingStage('upload');
+              setUploadedFile(null);
+              setFolders([]);
+              setAllAssignments({});
+              setCurrentFolderIndex(0);
+              setShowSummary(false);
+            }}
+            className="h-14 px-10 text-lg font-bold bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+          >
+            Process Another File
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // Pan handlers - using wheel/trackpad
   const handleWheel = (e: React.WheelEvent) => {
@@ -288,7 +436,7 @@ export default function FaceNamingPage() {
       folder.images.forEach((image) => {
         nameGroups[assignedName].push({
           folder,
-          image: `/${folder.path}/${image}`
+          image: folder.imageUrls[folder.images.indexOf(image)] || `/${folder.path}/${image}`
         });
       });
     });

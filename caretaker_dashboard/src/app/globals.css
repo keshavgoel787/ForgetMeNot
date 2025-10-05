@@ -3,10 +3,34 @@
 :root {
   --background: #f6f7fb; /* soft light */
   --foreground: #334155; /* slate-700 */
+  
+  /* Chart colors */
+  --chart-1: 220 70% 50%;
+  --chart-2: 160 60% 45%;
+  --chart-3: 30 80% 55%;
+  --chart-4: 280 65% 60%;
+  --chart-5: 340 75% 55%;
+  
+  /* Border and muted colors for charts */
+  --border: 214.3 31.8% 91.4%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
 }
 .dark {
   --background: #0f172a; /* slate-900 */
   --foreground: #e2e8f0; /* slate-200 */
+  
+  /* Chart colors for dark mode */
+  --chart-1: 220 70% 50%;
+  --chart-2: 160 60% 45%;
+  --chart-3: 30 80% 55%;
+  --chart-4: 280 65% 60%;
+  --chart-5: 340 75% 55%;
+  
+  /* Border and muted colors for charts in dark mode */
+  --border: 217.2 32.6% 17.5%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
 }
 
 body {
