@@ -30,7 +30,7 @@
           background: #dbe7f5; /* light blue page background */
         }
 
-        /* Left navbar */
+        /* navbar */
         .sidebar {
           min-width: 120px;
           max-width: 180px;
@@ -97,10 +97,10 @@
 
         .nav-item:hover {
           background: rgba(255,255,255,0.65);
+          transform: scale(1.1);
         }
         
         
-        /* Remember Screen - Animated Memory Interface */
         .remember-container {
           position: relative;
           width: 100%;
@@ -112,7 +112,6 @@
           justify-content: center;
         }
         
-        /* Central Square */
         .central-circle {
           position: relative;
           width: 200px;
@@ -164,6 +163,12 @@
         .memory-bubble {
           pointer-events: auto !important;
           transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+          position: absolute;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          pointer-events: auto !important;
+          cursor: pointer;
         }
 
         
@@ -173,24 +178,13 @@
           opacity: 0;
         }
 
-        .memory-bubble.expanding {
-          transform: scale(1.3);
-          transition: transform 0.4s ease-out;
-        }
-
-
         @keyframes bubble-expand {
-          0% { transform: scale(0.3); }
-          50% { transform: scale(0.6); }
+          0% { transform: scale(0.1); }
           100% { transform: scale(1); }
         }
-        /* Memory Bubbles */
-        .memory-bubble {
-          position: absolute;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          /* Remove counterRotate, handled below */
+
+        .memory-bubble.expanding {
+          transform: scale(1.0);
         }
 
         .memory-bubble-orbit {
@@ -209,7 +203,6 @@
           to { transform: rotate(360deg); }
         }
         
-        /* Counter-rotation to keep content upright */
         @keyframes counterRotate {
           from { transform: rotate(0deg); }
           to { transform: rotate(-360deg); }
@@ -325,15 +318,6 @@
           transform: scale(1.1);
         }
 
-        .nav-item:hover {
-          transform: scale(1.1);
-        }
-
-        .memory-bubble {
-          pointer-events: auto !important;
-          transition: transform 0.3s ease-out, opacity 0.3s ease-out;
-          cursor: pointer;
-        }
         
         .memory-bubble:hover {
           transform: scale(1.1);
@@ -359,26 +343,6 @@
           font-size: 10px;
         }
         
-        /* Animation for new memories joining orbit */
-        .memory-joining {
-          animation: joinOrbit 2s ease-out forwards;
-        }
-        
-        @keyframes joinOrbit {
-          0% {
-            transform: scale(1) translateY(0);
-            opacity: 1;
-          }
-          50% {
-            transform: scale(0.3) translateY(-100px);
-            opacity: 0.8;
-          }
-          100% {
-            transform: scale(1) translateY(-250px);
-            opacity: 1;
-          }
-        }
-
         /* Right content area */
         .main {
           flex: 1;
@@ -490,8 +454,6 @@
               // Temporarily add "expanding" class to all existing bubbles
               document.querySelectorAll('.memory-bubble').forEach(bubble => {
                 bubble.classList.add('expanding');
-                // Remove it after animation finishes
-                setTimeout(() => bubble.classList.remove('expanding'), 400);
               });
 
               // Update memory list with evenly distributed angles
@@ -506,6 +468,7 @@
               setTimeout(() => setIsAnimating(false), 1000);
             }
           };          
+          
           const handleKeyPress = (e) => {
             if (e.key === 'Enter') {
               addMemory();
@@ -544,7 +507,6 @@
           
           const RememberScreen = () => {
             const suggestions = ['Brian', 'Hiker', 'Fireworks', 'Forest', 'Love', 'Park', 'Sunset'];
-            console.log('RememberScreen rendering, memories count:', memories.length);
             return React.createElement('div', { className: 'screen active' },
               React.createElement('div', { className: 'remember-container' },
                 // Central Rainbow Circle with star
@@ -596,7 +558,6 @@
                           cursor: 'pointer'
                         },
                         onClick: (e) => {
-                          console.log('Bubble clicked:', memory.text);
                           e.stopPropagation();
                           removeMemory(memory.id);
                         }
