@@ -13,6 +13,7 @@ from api.transcribe import router as transcribe_router
 from api.memories import router as memories_router
 from api.metadata import router as metadata_router
 from api.upload import router as upload_router
+from api.experiences import router as experiences_router
 
 # Load environment variables
 load_dotenv()
@@ -71,6 +72,7 @@ app.include_router(transcribe_router, tags=["Transcription"])
 app.include_router(memories_router, tags=["Memories"])
 app.include_router(metadata_router, tags=["Metadata"])
 app.include_router(upload_router, tags=["Upload"])
+app.include_router(experiences_router, tags=["Experiences"])
 
 
 @app.get("/")
