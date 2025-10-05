@@ -78,7 +78,7 @@ def get_agent_profile(agent_name: str = "Avery") -> AgentProfile:
 
 
 async def generate_agent_speech(text: str, voice_name: str) -> str:
-    """Call TTS API to generate speech"""
+    """Call TTS API to generate speech and upload to GCS"""
 
     tts_url = "https://forgetmenot-eq7i.onrender.com/text-to-speech"
 
@@ -91,12 +91,31 @@ async def generate_agent_speech(text: str, voice_name: str) -> str:
         if response.status_code != 200:
             raise HTTPException(
                 status_code=500,
-                detail=f"TTS API failed: {response.text}"
+                detail=f"TTS API failed: {response.status_code}"
             )
 
-        # TTS API returns audio URL as string
-        audio_url = response.json()
-        return audio_url
+        # TTS API returns binary MP3 audio
+        # Upload to GCS and return public URL
+        from google.cloud import storage
+        import time
+
+        bucket_name = os.getenv("GCS_BUCKET", "forgetmenot-videos")
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+
+        # Create unique filename
+        timestamp = int(time.time() * 1000)
+        filename = f"agent_audio/{voice_name}_{timestamp}.mp3"
+        blob = bucket.blob(filename)
+
+        # Upload binary audio content
+        blob.upload_from_string(response.content, content_type="audio/mpeg")
+
+        # Make public and get URL
+        blob.make_public()
+        public_url = blob.public_url
+
+        return public_url
 
 
 @router.post("/talk", response_model=AgentResponse)
@@ -142,13 +161,16 @@ async def talk_to_agent(
     temp_path = None
     try:
         # Step 1: Save and transcribe audio
-        temp_path = f"/tmp/{audio_file.filename}"
+        import time
+        temp_path = f"/tmp/agent_{int(time.time())}_{audio_file.filename}"
         with open(temp_path, "wb") as f:
             content = await audio_file.read()
             f.write(content)
 
-        transcription = transcribe_audio_file(temp_path)
         print(f"🤖 Agent conversation started")
+        print(f"   Audio saved to: {temp_path}")
+
+        transcription = transcribe_audio_file(temp_path)
         print(f"   Patient said: '{transcription}'")
         print(f"   Topic: {topic}")
 
