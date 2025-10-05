@@ -64,6 +64,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://forgetmenotclient.onrender.com",
+        "https://forgetmenot-p4pb.onrender.com",
         "https://forget-me-not.tech",
         "http://localhost:5173",  # Local development
         "http://localhost:3000",  # Alternative local port
