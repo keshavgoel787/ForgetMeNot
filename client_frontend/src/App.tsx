@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Import memory data
 import avery1 from './testdata/avery1.json';
@@ -23,7 +24,7 @@ interface Memory {
 const ImagePlaygroundUI = () => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [currentMemoryIndex, setCurrentMemoryIndex] = useState(0);
   const [displayMode, setDisplayMode] = useState<'3-pic' | '4-pic' | '5-pic' | 'video' | 'vertical-video'>('video');
@@ -33,7 +34,11 @@ const ImagePlaygroundUI = () => {
   const [showContent, setShowContent] = useState(false);
   const recognitionRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const wasInterrupted = useRef(false);
+  const backgroundMusicRef = useRef<HTMLAudioElement | null>(null);
+  const [isAudioReady, setIsAudioReady] = useState(false);
+  const [isLoadingMusic, setIsLoadingMusic] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [petalsExplode, setPetalsExplode] = useState(false);
 
   const memories: Memory[] = [
     avery1, avery2, avery3, college1, college2, disney1, ski1, football1, tyler1
@@ -51,6 +56,15 @@ const ImagePlaygroundUI = () => {
     { id: 5, label: 'Football', icon: '🏈' },
     { id: 6, label: 'Tyler', icon: '🧑' }
   ];
+
+  const topicMusicPrompts: Record<string, string> = {
+    'Avery': 'Warm nostalgic acoustic music with gentle piano and strings, peaceful and heartwarming atmosphere',
+    'College': 'Upbeat inspiring music with hopeful melodies, celebrating achievement and new beginnings',
+    'Disney': 'Magical whimsical orchestral music with wonder and excitement, playful and enchanting',
+    'Ski': 'Energetic adventurous music with dynamic rhythms, capturing thrill and mountain atmosphere',
+    'Football': 'Powerful triumphant sports anthem with driving beats and heroic brass, victory celebration',
+    'Tyler': 'Cheerful uplifting music with bright melodies, youthful energy and joy'
+  };
 
   const backgroundCircles = [
     { id: 'bg1', x: 8, y: 15, size: 70, delay: 0, icon: '🎨' },
@@ -86,7 +100,7 @@ const ImagePlaygroundUI = () => {
       };
 
       recognitionRef.current.onend = () => {
-        if (isListening && !isPlayingAudio) {
+        if (isListening && !isPlaying) {
           recognitionRef.current.start();
         }
       };
@@ -97,13 +111,79 @@ const ImagePlaygroundUI = () => {
         recognitionRef.current.stop();
       }
     };
-  }, [isListening, isPlayingAudio]);
+  }, [isListening, isPlaying]);
 
   const advanceToNextMemory = () => {
     if (!selectedTopic) return;
     
     const nextIndex = (currentMemoryIndex + 1) % filteredMemories.length;
     loadMemory(nextIndex);
+  };
+
+  const generateAndPlayBackgroundMusic = async (topic: string) => {
+    try {
+      setIsLoadingMusic(true);
+      console.log('Generating background music for topic:', topic);
+      
+      const musicPrompt = topicMusicPrompts[topic];
+      if (!musicPrompt) {
+        console.warn('No music prompt found for topic:', topic);
+        return;
+      }
+
+      const response = await fetch('https://forgetmenot-eq7i.onrender.com/text-to-sound', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: musicPrompt,
+          duration_seconds: 15,
+          prompt_influence: 0.5
+        })
+      });
+
+      console.log('Music response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Music API Error:', errorText);
+        setIsLoadingMusic(false);
+        return;
+      }
+      
+      const audioBlob = await response.blob();
+      console.log('Music blob size:', audioBlob.size, 'type:', audioBlob.type);
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      if (backgroundMusicRef.current) {
+        backgroundMusicRef.current.pause();
+        URL.revokeObjectURL(backgroundMusicRef.current.src);
+        backgroundMusicRef.current = null;
+      }
+      
+      const music = new Audio(audioUrl);
+      music.volume = 0.15;
+      music.loop = true;
+      backgroundMusicRef.current = music;
+      
+      music.oncanplaythrough = () => {
+        console.log('Background music ready to play');
+        setIsLoadingMusic(false);
+      };
+      
+      music.onerror = (e) => {
+        console.error('Background music error:', e);
+        setIsLoadingMusic(false);
+      };
+      
+      await music.play();
+      console.log('Background music started playing');
+      
+    } catch (error) {
+      console.error('Error generating background music:', error);
+      setIsLoadingMusic(false);
+    }
   };
 
   const fetchAndPlayAudio = async (text: string) => {
@@ -154,24 +234,35 @@ const ImagePlaygroundUI = () => {
       
       audio.onplay = () => {
         console.log('Audio started playing');
-        setShowContent(true);
+        
+        // Always trigger explosion when audio plays
+        setPetalsExplode(true);
+        
+        // Wait for explosion to complete
+        setTimeout(() => {
+          setIsTransitioning(false);
+          setShowContent(true);
+        }, 500);
+        
         setFadeKey(prev => prev + 1);
         setIsLoadingAudio(false);
+        setIsAudioReady(true); // Show mic button when audio is ready
       };
       
       audio.onended = () => {
         console.log('Audio ended');
-        setIsPlayingAudio(false);
+        setIsPlaying(false);
+        // Keep content visible when audio ends naturally
       };
       
       audio.onerror = (e) => {
         console.error('Audio playback error:', e);
         setIsLoadingAudio(false);
         setShowContent(true);
-        setIsPlayingAudio(false);
+        setIsPlaying(false);
       };
       
-      setIsPlayingAudio(true);
+      setIsPlaying(true);
       console.log('Attempting to play audio...');
       await audio.play();
       console.log('Audio play() called successfully');
@@ -180,7 +271,7 @@ const ImagePlaygroundUI = () => {
       console.error('Error in fetchAndPlayAudio:', error);
       setIsLoadingAudio(false);
       setShowContent(true);
-      setIsPlayingAudio(false);
+      setIsPlaying(false);
     }
   };
 
@@ -190,32 +281,53 @@ const ImagePlaygroundUI = () => {
     const memory = filteredMemories[index];
     if (!memory) return;
     
-    setCurrentMemoryIndex(index);
-    setDisplayMode(memory.displayMode);
-    setCurrentMedia(memory.media);
-    fetchAndPlayAudio(memory.text);
+    // Fade out current content
+    setShowContent(false);
+    
+    // Stop current audio playback
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    
+    // Reset states but keep mic visible (don't set isAudioReady to false)
+    setIsListening(false);
+    setIsPlaying(false);
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    
+    // Wait for content to fade out (1 second), then show flower
+    setTimeout(() => {
+      setIsTransitioning(true);
+      setPetalsExplode(false);
+      
+      // Load content after flower appears
+      setCurrentMemoryIndex(index);
+      setDisplayMode(memory.displayMode);
+      setCurrentMedia(memory.media);
+      fetchAndPlayAudio(memory.text);
+    }, 1000);
   };
 
   const handleMicClick = () => {
-    if (isPlayingAudio) {
-      // Interrupt audio and start listening
+    if (isPlaying) {
+      // Interrupt audio and start listening (don't fade content)
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
-      setIsPlayingAudio(false);
-      wasInterrupted.current = true;
+      setIsPlaying(false);
       setIsListening(true);
       if (recognitionRef.current) {
         recognitionRef.current.start();
       }
     } else if (isListening) {
-      // Stop listening and advance to next memory
+      // Stop listening and advance to next memory (this will fade content)
       setIsListening(false);
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
-      // Advance to next memory
       advanceToNextMemory();
     } else {
       // Start listening
@@ -227,21 +339,70 @@ const ImagePlaygroundUI = () => {
   };
 
   const handleTopicClick = (topic: string) => {
+    // Don't process if already processing this topic
+    if (selectedTopic === topic) return;
+    
+    // Fade out current content if any
+    if (selectedTopic) {
+      setShowContent(false);
+    }
+    
+    // Stop all audio and reset states
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    
+    if (backgroundMusicRef.current) {
+      backgroundMusicRef.current.pause();
+      URL.revokeObjectURL(backgroundMusicRef.current.src);
+      backgroundMusicRef.current = null;
+    }
+    
     setSelectedTopic(topic);
     setCurrentMemoryIndex(0);
+    setIsAudioReady(false);
+    setIsListening(false);
+    setIsPlaying(false);
+    
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    
+    // Generate background music for this topic
+    generateAndPlayBackgroundMusic(topic);
+    
     const topicMemories = memories.filter(m => m.topic === topic);
     if (topicMemories.length > 0) {
       const memory = topicMemories[0];
       if (!memory) return;
       
-      setDisplayMode(memory.displayMode);
-      setCurrentMedia(memory.media);
-      fetchAndPlayAudio(memory.text);
+      // Wait for start screen to fade out (1 second), then show flower
+      setTimeout(() => {
+        setIsTransitioning(true);
+        setPetalsExplode(false);
+        
+        // Load content after flower appears
+        setDisplayMode(memory.displayMode);
+        setCurrentMedia(memory.media);
+        fetchAndPlayAudio(memory.text);
+      }, 1000);
     }
   };
 
   useEffect(() => {
-    // Don't auto-start listening on mount
+    // Don't auto-start listening - wait for first memory to load
+    
+    return () => {
+      if (backgroundMusicRef.current) {
+        backgroundMusicRef.current.pause();
+        backgroundMusicRef.current = null;
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
   }, []);
 
   return (
@@ -254,21 +415,142 @@ const ImagePlaygroundUI = () => {
       justifyContent: 'center',
       position: 'relative',
       overflow: 'hidden',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      fontFamily: 'Georgia, serif'
     }}>
       {backgroundCircles.map((circle) => (
-        <div key={circle.id} style={{ position: 'absolute', left: `${circle.x}%`, top: `${circle.y}%`, width: `${circle.size}px`, height: `${circle.size}px`, borderRadius: '50%', background: 'linear-gradient(135deg, rgba(0, 122, 255, 0.3), rgba(10, 132, 255, 0.2))', border: '2px solid rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: `${circle.size * 0.5}px`, animation: `floatBackground 4s ease-in-out infinite`, animationDelay: `${circle.delay}s`, zIndex: 0, opacity: 0.7 }}>{circle.icon}</div>
+        <div key={circle.id} style={{ position: 'absolute', left: `${circle.x}%`, top: `${circle.y}%`, width: `${circle.size}px`, height: `${circle.size}px`, borderRadius: '50%', background: 'linear-gradient(135deg, rgba(123, 168, 193, 0.3), rgba(123, 168, 193, 0.2))', border: '2px solid rgba(123, 168, 193, 0.2)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: `${circle.size * 0.5}px`, animation: `floatBackground 4s ease-in-out infinite`, animationDelay: `${circle.delay}s`, zIndex: 0, opacity: 0.7 }}>{circle.icon}</div>
       ))}
 
+      {/* Starting Screen */}
+      <AnimatePresence>
+        {!selectedTopic && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1, ease: 'easeInOut' }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 15,
+              pointerEvents: 'none'
+            }}
+          >
+          <div style={{ textAlign: 'center', zIndex: 1, marginBottom: '80px' }}>
+            <h1 style={{
+              color: 'white',
+              fontSize: '96px',
+              fontFamily: 'Georgia, serif',
+              marginBottom: '10px',
+              marginTop: '0',
+              letterSpacing: '2px',
+              textShadow: '0 0 30px rgba(0,0,0,0.8), 0 0 60px rgba(0,0,0,0.5)'
+            }}>
+              Forget Me Not
+            </h1>
+            <p style={{
+              color: 'white',
+              fontSize: '32px',
+              fontFamily: 'Georgia, serif',
+              fontStyle: 'italic',
+              margin: '0',
+              letterSpacing: '1px',
+              textShadow: '0 0 20px rgba(0,0,0,0.8), 0 0 40px rgba(0,0,0,0.5)'
+            }}>
+              Remembering is recovering
+            </p>
+          </div>
+          
+          <svg width="300" height="375" viewBox="0 0 200 250" style={{ position: 'absolute', bottom: '0', animation: 'bloomUp 2s ease-out forwards, sway 4s ease-in-out 2s infinite', transformOrigin: 'center bottom' }}>
+            {/* Stem */}
+            <path
+              d="M 100 250 Q 95 180 100 150 Q 105 120 100 80"
+              stroke="#2d5016"
+              strokeWidth="4"
+              fill="none"
+            />
+            
+            {/* Branch stems */}
+            <path d="M 100 150 Q 85 140 75 130" stroke="#2d5016" strokeWidth="2" fill="none" />
+            <path d="M 100 120 Q 120 110 135 100" stroke="#2d5016" strokeWidth="2" fill="none" />
+            
+            {/* Flower 1 - Main large flower */}
+            <g transform="translate(100, 80)">
+              {[0, 72, 144, 216, 288].map((angle, i) => (
+                <g key={`main-${i}`} transform={`rotate(${angle})`}>
+                  <ellipse
+                    cx="0"
+                    cy="-18"
+                    rx="12"
+                    ry="16"
+                    fill="#7ba8c1"
+                    opacity="0.9"
+                  />
+                </g>
+              ))}
+              <circle cx="0" cy="0" r="7" fill="#f4d03f" />
+            </g>
+            
+            {/* Flower 2 - Left smaller flower */}
+            <g transform="translate(75, 130)">
+              {[0, 72, 144, 216, 288].map((angle, i) => (
+                <g key={`left-${i}`} transform={`rotate(${angle})`}>
+                  <ellipse
+                    cx="0"
+                    cy="-14"
+                    rx="9"
+                    ry="12"
+                    fill="#7ba8c1"
+                    opacity="0.9"
+                  />
+                </g>
+              ))}
+              <circle cx="0" cy="0" r="5" fill="#f4d03f" />
+            </g>
+            
+            {/* Flower 3 - Right smaller flower */}
+            <g transform="translate(135, 100)">
+              {[0, 72, 144, 216, 288].map((angle, i) => (
+                <g key={`right-${i}`} transform={`rotate(${angle})`}>
+                  <ellipse
+                    cx="0"
+                    cy="-12"
+                    rx="8"
+                    ry="10"
+                    fill="#7ba8c1"
+                    opacity="0.9"
+                  />
+                </g>
+              ))}
+              <circle cx="0" cy="0" r="4" fill="#f4d03f" />
+            </g>
+          </svg>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ 
-          width: displayMode === 'vertical-video' ? '320px' : '700px', 
-          height: displayMode === 'vertical-video' ? '500px' : '400px', 
-          borderRadius: '24px', 
-          overflow: 'hidden',
-          transition: 'all 0.5s ease',
-          opacity: showContent ? 1 : 0.3
-        }}>
+        <AnimatePresence mode="wait">
+          {showContent && (
+            <motion.div
+              key={`content-${currentMemoryIndex}`}
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 1, ease: 'easeInOut' }}
+              style={{ 
+                width: displayMode === 'vertical-video' ? '320px' : '700px', 
+                height: displayMode === 'vertical-video' ? '500px' : '400px', 
+                borderRadius: '24px', 
+                overflow: 'hidden'
+              }}
+            >
           {showContent && displayMode === 'video' && currentMedia[0] && (
             <div key={`video-${fadeKey}`} className="fade-in" style={{ width: '100%', height: '100%' }}>
               <video autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }}>
@@ -359,7 +641,9 @@ const ImagePlaygroundUI = () => {
               )}
             </div>
           )}
-        </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 50 }}>
@@ -401,10 +685,92 @@ const ImagePlaygroundUI = () => {
         </div>
       </div>
 
-      <div style={{ position: 'absolute', bottom: '30px', left: '50%', transform: 'translateX(-50%)', zIndex: 100 }}>
+      {/* Music Loading Indicator */}
+      {/* Loading Flower */}
+      <AnimatePresence>
+        {isTransitioning && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.3 }}
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              zIndex: 150,
+              pointerEvents: 'none',
+              width: '120px',
+              height: '120px',
+              marginLeft: '-60px',
+              marginTop: '-60px'
+            }}
+          >
+            <svg width="120" height="120" viewBox="0 0 160 160" style={{ display: 'block' }}>
+              <g className={!petalsExplode ? 'rotating' : ''} style={{ transformOrigin: '80px 80px' }}>
+                {[0, 1, 2, 3, 4].map((i) => {
+                  const angle = i * 72;
+                  const radians = (angle - 90) * (Math.PI / 180);
+                  const distance = 20;
+                  const x = 80 + Math.cos(radians) * distance;
+                  const y = 80 + Math.sin(radians) * distance;
+                  const explodeDistance = 60;
+                  const explodeX = Math.cos(radians) * explodeDistance;
+                  const explodeY = Math.sin(radians) * explodeDistance;
+                  
+                  return (
+                    <g
+                      key={i}
+                      transform={`translate(${x}, ${y})`}
+                      style={{
+                        animation: petalsExplode ? `explode-${i} 0.5s ease-out forwards` : 'none'
+                      }}
+                    >
+                      <ellipse
+                        cx="0"
+                        cy="0"
+                        rx="14"
+                        ry="18"
+                        fill="#7ba8c1"
+                        opacity="0.9"
+                        transform={`rotate(${angle})`}
+                      />
+                    </g>
+                  );
+                })}
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="8"
+                  fill="#f4d03f"
+                  className={petalsExplode ? 'center-fade' : ''}
+                />
+              </g>
+            </svg>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Only show mic button when audio is ready */}
+      <AnimatePresence>
+        {isAudioReady && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1, ease: 'easeInOut' }}
+            style={{ 
+              position: 'absolute', 
+              bottom: '30px', 
+              left: '50%', 
+              transform: 'translateX(-50%)', 
+              zIndex: 100
+            }}
+          >
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
           <button
             onClick={handleMicClick}
+            disabled={isLoadingAudio}
             style={{
               width: '64px',
               height: '64px',
@@ -414,10 +780,11 @@ const ImagePlaygroundUI = () => {
               justifyContent: 'center',
               background: 'none',
               border: 'none',
-              cursor: 'pointer',
-              transition: 'background 0.3s'
+              cursor: isLoadingAudio ? 'not-allowed' : 'pointer',
+              transition: 'background 0.3s',
+              opacity: isLoadingAudio ? 0.5 : 1
             }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+            onMouseEnter={(e) => !isLoadingAudio && (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)')}
             onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
           >
             {isListening ? (
@@ -451,14 +818,19 @@ const ImagePlaygroundUI = () => {
           </div>
 
           <p style={{ height: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>
-            {isPlayingAudio ? 'Remembering...' : isListening ? 'Listening...' : 'Click to speak'}
+            {isPlaying ? 'Remembering...' : isListening ? 'Listening...' : 'Click to speak'}
           </p>
         </div>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <style>{`
         @keyframes floatBackground { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-20px); } }
-        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        @keyframes pulse { 
+          0%, 100% { transform: scale(1); opacity: 1; } 
+          50% { transform: scale(1.1); opacity: 0.8; } 
+        }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         @keyframes fadeIn { 
           from { 
@@ -470,8 +842,74 @@ const ImagePlaygroundUI = () => {
             transform: scale(1);
           } 
         }
+        @keyframes bloomUp {
+          from {
+            transform: translateY(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        @keyframes sway {
+          0% {
+            transform: translateY(0) rotate(2deg);
+          }
+          50% {
+            transform: translateY(0) rotate(-2deg);
+          }
+          100% {
+            transform: translateY(0) rotate(2deg);
+          }
+        }
+        .rotating {
+          animation: rotate 2s linear infinite;
+          transform-origin: 80px 80px;
+          transform: rotate(36deg);
+        }
+        @keyframes rotate {
+          from { transform: rotate(36deg); }
+          to { transform: rotate(396deg); }
+        }
+        @keyframes explode-0 {
+          to {
+            transform: translate(137.08px, 23.51px);
+            opacity: 0;
+          }
+        }
+        @keyframes explode-1 {
+          to {
+            transform: translate(129.27px, 62.36px);
+            opacity: 0;
+          }
+        }
+        @keyframes explode-2 {
+          to {
+            transform: translate(91.42px, 91.42px);
+            opacity: 0;
+          }
+        }
+        @keyframes explode-3 {
+          to {
+            transform: translate(42.36px, 69.27px);
+            opacity: 0;
+          }
+        }
+        @keyframes explode-4 {
+          to {
+            transform: translate(22.92px, 23.51px);
+            opacity: 0;
+          }
+        }
+        .center-fade {
+          animation: fade-out 0.5s ease-out forwards;
+        }
+        @keyframes fade-out {
+          to { opacity: 0; }
+        }
         .fade-in {
-          animation: fadeIn 3s ease-out forwards;
+          animation: fadeIn 1s ease-out forwards;
         }
       `}</style>
     </div>
