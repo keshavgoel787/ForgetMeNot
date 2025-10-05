@@ -5,6 +5,8 @@ By combining multimodal AI, voice synthesis, and intuitive dashboards, the syste
 
 ---
 
+## Screen Shot
+
 ![Patient Portal](./Patient_Portal.png)
 
 
