@@ -1,0 +1,12 @@
+{
+  "id": "disney1",
+  "topic": "Disney",
+  "text": "The magical trip to Disney was unforgettable! Meeting favorite characters, riding thrilling attractions, and watching the spectacular fireworks show made this a dream come true. The joy and wonder on everyone's faces truly captured the Disney magic.",
+  "displayMode": "4-pic",
+  "media": [
+    "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800",
+    "https://images.unsplash.com/photo-1513407030348-c983a97b98d8?w=800",
+    "https://images.unsplash.com/photo-1527856263669-12c3a0af2aa6?w=800",
+    "https://images.unsplash.com/photo-1548169874-53e85f753f1e?w=800"
+  ]
+}

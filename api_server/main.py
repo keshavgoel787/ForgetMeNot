@@ -362,16 +362,32 @@ def get_elevenlabs_voices() -> dict:
         voices = response.json().get("voices", [])
         
         # Create mapping: person_name -> voice_id
-        # Looking for voices ending with "_voice_forgetmenot"
         voice_mapping = {}
+        
+        # Custom mappings: API name -> ElevenLabs voice name
+        custom_mappings = {
+            "avery": "college girl voice",
+            "tyler": "disney vlog audio",
+            "therapist": "therapist_voice",
+            "therapist_voice": "therapist_voice"
+        }
+        
         for voice in voices:
             voice_name = voice.get("name", "")
             voice_id = voice.get("voice_id", "")
             
+            # Check custom mappings first
+            for api_name, elevenlabs_name in custom_mappings.items():
+                if voice_name.lower() == elevenlabs_name.lower():
+                    voice_mapping[api_name.lower()] = voice_id
+            
+            # Also support automatic detection for "_voice_forgetmenot" suffix
             if voice_name.endswith("_voice_forgetmenot"):
                 # Extract person name (e.g., "Tyler_voice_forgetmenot" -> "Tyler")
                 person_name = voice_name.replace("_voice_forgetmenot", "")
-                voice_mapping[person_name.lower()] = voice_id
+                # Only add if not already mapped via custom mapping
+                if person_name.lower() not in voice_mapping:
+                    voice_mapping[person_name.lower()] = voice_id
         
         return voice_mapping
     except Exception as e:

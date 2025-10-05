@@ -1,0 +1,13 @@
+{
+  "id": "football1",
+  "topic": "Football",
+  "text": "Game day excitement filled the stadium! The team played with incredible determination and teamwork. From the kickoff to the final whistle, every play kept everyone on the edge of their seats. The roar of the crowd and the thrill of victory made this an amazing experience.",
+  "displayMode": "5-pic",
+  "media": [
+    "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=800",
+    "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?w=800",
+    "https://images.unsplash.com/photo-1566577739112-5180d4bf9390?w=800",
+    "https://images.unsplash.com/photo-1484252990155-e33e48551d85?w=800",
+    "https://images.unsplash.com/photo-1560272564-c83b66b1ad12?w=800"
+  ]
+}

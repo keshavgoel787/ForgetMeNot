@@ -62,14 +62,23 @@ memories/
 # Processing script data
 processing_script/pre_processed/
 processing_script/post_processed/
+processing_script/**/*.json
+!processing_script/names.json.example
 
 # API server data
 api_server/pre_processed/
 api_server/post_processed/
 api_server/temp_processing/
+api_server/**/*.json
 
-# Google Cloud credentials (but allow package.json, tsconfig.json, etc.)
-*.json
+# Block JSON files in data directories but allow in client_frontend
+memories/**/*.json
+people/**/*.json
+pre_processed/**/*.json
+post_processed/**/*.json
+
+# Allow package.json, tsconfig.json, etc.
 !package.json
+package-lock.json
 !tsconfig*.json
 !*config.json

@@ -1,0 +1,11 @@
+{
+  "id": "ski1",
+  "topic": "Ski",
+  "text": "The ski trip to the mountains was absolutely thrilling! Fresh powder, blue skies, and the rush of flying down the slopes made for an incredible winter adventure. Whether carving through fresh snow or warming up with hot cocoa, every moment was perfect.",
+  "displayMode": "3-pic",
+  "media": [
+    "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=800",
+    "https://images.unsplash.com/photo-1605540436563-5bca919ae766?w=800",
+    "https://images.unsplash.com/photo-1498146831523-fbe41acdc5ad?w=800"
+  ]
+}

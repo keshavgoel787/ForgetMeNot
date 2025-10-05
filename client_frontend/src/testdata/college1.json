@@ -1,0 +1,13 @@
+{
+  "id": "college1",
+  "topic": "College",
+  "text": "College days were full of excitement and new adventures. From late night study sessions to celebrating with friends, these photos capture the energy and enthusiasm of campus life. Every moment was a chance to learn, grow, and create lasting friendships.",
+  "displayMode": "5-pic",
+  "media": [
+    "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800",
+    "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=800",
+    "https://images.unsplash.com/photo-1498243691581-b145c3f54a5a?w=800",
+    "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800",
+    "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800"
+  ]
+}
