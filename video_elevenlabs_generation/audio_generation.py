@@ -6,6 +6,8 @@ url = "https://forgetmenot-eq7i.onrender.com/text-to-speech"
 
 headers = {"Content-Type": "application/json"}
 
+# replace all "some visual feedback" comments
+# currently just placeholder
 data = {"text": "Can you try to remember me?","name": "Tyler"}
 
 
