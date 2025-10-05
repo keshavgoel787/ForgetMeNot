@@ -99,25 +99,15 @@ async def patient_query_test_optimized(
     try:
         print(f"📝 Transcription: {transcription}")
 
-        # OPTIMIZATION 1: Parallel execution with separate connections
-        # Each task gets its own Snowflake connection to avoid threading issues
-
-        async def classify_task():
-            with SnowflakeClient() as client:
-                return classify_intent_and_media(transcription, topic, client)
-
+        # OPTIMIZATION: Parallel execution - fetch memories once
         async def retrieve_task():
             with SnowflakeClient() as client:
                 return await get_memories_cached(topic, client, patient_id)
 
-        # Execute in parallel
-        (display_mode, media_info), all_memories = await asyncio.gather(
-            asyncio.to_thread(classify_task),
-            retrieve_task
-        )
+        # Start memory retrieval immediately
+        all_memories = await retrieve_task()
 
-        print(f"🎯 Display Mode: {display_mode}")
-        print(f"⚡ Parallel fetch completed in {time.time() - start_time:.2f}s")
+        print(f"⚡ Memory fetch completed in {time.time() - start_time:.2f}s")
 
         if not all_memories:
             raise HTTPException(
@@ -133,26 +123,40 @@ async def patient_query_test_optimized(
             session_manager.reset_session(patient_id, topic)
             unseen_memories = all_memories
 
-        # Select media
+        # PARALLEL OPTIMIZATION: Run classification and narration generation in parallel
+        async def classify_task():
+            with SnowflakeClient() as client:
+                return classify_intent_and_media(transcription, topic, client)
+
+        async def narration_task():
+            memories_context = format_memories_for_gemini(unseen_memories[:5])
+            return await asyncio.to_thread(
+                generate_narration,
+                topic,
+                memories_context,
+                transcription,
+                patient_id
+            )
+
+        # Execute classification and narration in parallel
+        (display_mode, media_info), narration_text = await asyncio.gather(
+            asyncio.to_thread(classify_task),
+            narration_task()
+        )
+
+        print(f"🎯 Display Mode: {display_mode}")
+        print(f"💬 Narration: {narration_text}")
+        print(f"⚡ Parallel processing completed in {time.time() - start_time:.2f}s")
+
+        # Select media based on display mode
         adjusted_mode, media_urls = select_media_for_mode(display_mode, unseen_memories)
         print(f"📸 Adjusted Mode: {adjusted_mode} - {len(media_urls)} media")
 
-        # Mark as shown
+        # Mark as shown and save conversation
         session_manager.mark_as_shown(patient_id, topic, media_urls)
-
-        # Save conversation turn
         conversation_history.add_turn(patient_id, topic, "patient", transcription)
 
-        # Generate narration
-        narration_text = None
         if adjusted_mode != "agent":
-            memories_context = format_memories_for_gemini(unseen_memories[:5])
-
-            # OPTIMIZATION 2: Use cached LLM responses when possible
-            # Note: For personalized responses, caching is limited
-            narration_text = generate_narration(topic, memories_context, transcription, patient_id)
-            print(f"💬 Narration: {narration_text}")
-
             conversation_history.add_turn(patient_id, topic, "agent", narration_text)
 
         elapsed = time.time() - start_time
@@ -160,7 +164,7 @@ async def patient_query_test_optimized(
 
         return PatientQueryResponse(
             topic=topic,
-            text=narration_text,
+            text=narration_text if adjusted_mode != "agent" else None,
             displayMode=adjusted_mode,
             media=media_urls
         )

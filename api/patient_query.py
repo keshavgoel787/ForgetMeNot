@@ -266,14 +266,8 @@ async def patient_query(
         transcription = transcribe_audio_file(temp_path)
         print(f"📝 Transcription: {transcription}")
 
-        # Step 3: Classify intent and get display mode
+        # Step 3: Retrieve memories first
         with SnowflakeClient() as client:
-            display_mode, media_info = classify_intent_and_media(
-                transcription, topic, client
-            )
-            print(f"🎯 Display Mode: {display_mode}")
-
-            # Step 4: Retrieve memories
             all_memories = search_memories_by_query(topic, client, top_k=50)
 
             if not all_memories:
@@ -282,42 +276,61 @@ async def patient_query(
                     detail=f"No memories found for topic: {topic}"
                 )
 
-            # Step 4.5: Filter out already-shown memories
-            unseen_memories = filter_unseen_memories(all_memories, patient_id, topic)
+        # Step 4: Filter out already-shown memories
+        unseen_memories = filter_unseen_memories(all_memories, patient_id, topic)
 
-            # If all memories have been shown, reset and use all
-            if not unseen_memories:
-                print("♻️  All memories shown - resetting session")
-                session_manager.reset_session(patient_id, topic)
-                unseen_memories = all_memories
+        # If all memories have been shown, reset and use all
+        if not unseen_memories:
+            print("♻️  All memories shown - resetting session")
+            session_manager.reset_session(patient_id, topic)
+            unseen_memories = all_memories
 
-            # Step 5: Select media based on display mode (adjusts mode if needed)
-            adjusted_mode, media_urls = select_media_for_mode(display_mode, unseen_memories)
-            print(f"📸 Adjusted Mode: {adjusted_mode} (from {display_mode}) - {len(media_urls)} media")
+        # OPTIMIZATION: Run classification and narration in parallel
+        import asyncio
 
-            # Step 5.5: Mark selected media as shown
-            session_manager.mark_as_shown(patient_id, topic, media_urls)
+        async def classify_task():
+            with SnowflakeClient() as client:
+                return classify_intent_and_media(transcription, topic, client)
 
-            # Step 6: Save patient's question to conversation history
-            conversation_history.add_turn(patient_id, topic, "patient", transcription)
-
-            # Step 7: Generate narration (if not agent mode)
-            narration_text = None
-            if adjusted_mode != "agent":
-                memories_context = format_memories_for_gemini(unseen_memories[:5])
-                narration_text = generate_narration(topic, memories_context, transcription, patient_id)
-                print(f"💬 Narration: {narration_text}")
-
-                # Save agent's response to conversation history
-                conversation_history.add_turn(patient_id, topic, "agent", narration_text)
-
-            # Step 8: Return response
-            return PatientQueryResponse(
-                topic=topic,
-                text=narration_text,
-                displayMode=adjusted_mode,
-                media=media_urls
+        async def narration_task():
+            memories_context = format_memories_for_gemini(unseen_memories[:5])
+            return await asyncio.to_thread(
+                generate_narration,
+                topic,
+                memories_context,
+                transcription,
+                patient_id
             )
+
+        # Execute in parallel
+        (display_mode, media_info), narration_text = await asyncio.gather(
+            asyncio.to_thread(classify_task),
+            narration_task()
+        )
+
+        print(f"🎯 Display Mode: {display_mode}")
+        print(f"💬 Narration: {narration_text}")
+
+        # Step 5: Select media based on display mode (adjusts mode if needed)
+        adjusted_mode, media_urls = select_media_for_mode(display_mode, unseen_memories)
+        print(f"📸 Adjusted Mode: {adjusted_mode} (from {display_mode}) - {len(media_urls)} media")
+
+        # Step 5.5: Mark selected media as shown
+        session_manager.mark_as_shown(patient_id, topic, media_urls)
+
+        # Step 6: Save conversation history
+        conversation_history.add_turn(patient_id, topic, "patient", transcription)
+
+        if adjusted_mode != "agent":
+            conversation_history.add_turn(patient_id, topic, "agent", narration_text)
+
+        # Step 7: Return response
+        return PatientQueryResponse(
+            topic=topic,
+            text=narration_text if adjusted_mode != "agent" else None,
+            displayMode=adjusted_mode,
+            media=media_urls
+        )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
