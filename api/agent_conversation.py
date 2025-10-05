@@ -6,8 +6,8 @@ who helps patients reminisce about memories in a natural, empathetic way.
 """
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from pydantic import BaseModel
+from typing import Dict, Any
 import sys
 import os
 import httpx
@@ -19,6 +19,7 @@ from scripts.lib.snowflake_client import SnowflakeClient
 from scripts.lib.gemini_client import generate_text
 from scripts.retrieval_cycle import search_memories_by_query, format_memories_for_gemini
 from api.conversation_history import conversation_history
+from api.patient_query import transcribe_audio_file
 
 router = APIRouter(prefix="/agent", tags=["Agent Conversation"])
 
@@ -100,33 +101,31 @@ async def generate_agent_speech(text: str, voice_name: str) -> str:
 
 @router.post("/talk", response_model=AgentResponse)
 async def talk_to_agent(
-    transcription: str = Form(..., description="What the patient said"),
+    audio_file: UploadFile = File(..., description="MP3 audio file from patient"),
     topic: str = Form(default="general", description="Conversation topic"),
     patient_id: str = Form(default="default_patient", description="Patient ID"),
     agent_name: str = Form(default="Avery", description="Agent name (default: Avery)")
 ):
     """
-    **Agent Conversation Endpoint (TEST)** - Talk to Avery
+    **Agent Conversation Endpoint** - Talk to Avery with Audio
 
-    The patient talks to Avery, an AI companion who responds with empathy
-    and helps them recall memories. Avery has a personality and voice.
+    Upload audio, Avery responds with her personality and voice.
 
     **Flow:**
-    1. Retrieve agent profile (Avery) from Snowflake
-    2. Search for relevant memories based on topic
-    3. Generate conversational response using Gemini (with Avery's personality)
-    4. Convert response to speech using TTS API (Avery's voice)
-    5. Return both text and audio
+    1. Transcribe patient's audio
+    2. Retrieve agent profile (Avery) from Snowflake
+    3. Search for relevant memories based on topic
+    4. Generate conversational response using Gemini (with Avery's personality)
+    5. Convert response to speech using TTS API (Avery's voice)
+    6. Return both text and audio
 
     **Example Request:**
     ```bash
     POST /agent/talk
-    {
-      "transcription": "Tell me about the beach",
-      "topic": "beach",
-      "patient_id": "patient_123",
-      "agent_name": "Avery"
-    }
+    Form Data:
+    - audio_file: <patient_audio.mp3>
+    - topic: "beach"
+    - patient_id: "patient_123"
     ```
 
     **Example Response:**
@@ -134,22 +133,30 @@ async def talk_to_agent(
     {
       "agent_name": "Avery",
       "text": "Oh, I love talking about the beach! Let me show you...",
-      "audio_url": "https://storage.googleapis.com/...",
+      "audio_url": "https://storage.googleapis.com/.../avery_response.mp3",
       "personality_note": "Warm, empathetic, humorous"
     }
     ```
     """
 
+    temp_path = None
     try:
+        # Step 1: Save and transcribe audio
+        temp_path = f"/tmp/{audio_file.filename}"
+        with open(temp_path, "wb") as f:
+            content = await audio_file.read()
+            f.write(content)
+
+        transcription = transcribe_audio_file(temp_path)
         print(f"🤖 Agent conversation started")
         print(f"   Patient said: '{transcription}'")
         print(f"   Topic: {topic}")
 
-        # Step 1: Get agent profile
+        # Step 2: Get agent profile
         agent = get_agent_profile(agent_name)
         print(f"   Agent: {agent.name} ({agent.voice_name})")
 
-        # Step 2: Retrieve relevant memories
+        # Step 3: Retrieve relevant memories
         with SnowflakeClient() as client:
             memories = search_memories_by_query(topic, client, top_k=5)
 
@@ -160,12 +167,12 @@ async def talk_to_agent(
         else:
             print(f"   No specific memories found - general conversation")
 
-        # Step 3: Get conversation history
+        # Step 4: Get conversation history
         conversation_context = conversation_history.get_formatted_history(
             patient_id, f"agent_{topic}", max_turns=5
         )
 
-        # Step 4: Generate response with Avery's personality
+        # Step 5: Generate response with Avery's personality
         prompt = f"""You are {agent.name}, {agent.description}
 
 Your personality: {agent.personality}
@@ -201,11 +208,11 @@ Respond as {agent.name} (2-3 sentences):"""
 
         print(f"   💬 {agent.name}: {response_text}")
 
-        # Step 5: Generate speech with agent's voice
+        # Step 6: Generate speech with agent's voice
         audio_url = await generate_agent_speech(response_text, agent.voice_name)
         print(f"   🔊 Audio generated: {audio_url}")
 
-        # Step 6: Save to conversation history
+        # Step 7: Save to conversation history
         conversation_history.add_turn(patient_id, f"agent_{topic}", "patient", transcription)
         conversation_history.add_turn(patient_id, f"agent_{topic}", "agent", response_text)
 
@@ -219,6 +226,11 @@ Respond as {agent.name} (2-3 sentences):"""
     except Exception as e:
         print(f"❌ Agent conversation error: {e}")
         raise HTTPException(status_code=500, detail=f"Agent conversation failed: {str(e)}")
+
+    finally:
+        # Cleanup temporary audio file
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 @router.get("/profile/{agent_name}")
