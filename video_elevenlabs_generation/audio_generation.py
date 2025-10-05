@@ -22,8 +22,8 @@ async def get_audio(data: dict):
         print(response.text)
         return 0
 
-async def play_talking_video(length = 1):
-    print("Playing talking video") # some visual feedback
+async def play_talking_video(name, length = 1):
+    print(f"{name}_talking.mp4") # some visual feedback
     await asyncio.sleep(length)
     return "✅ done talking"
 
@@ -31,13 +31,13 @@ async def generate_video(data: dict):
     audio = asyncio.create_task(get_audio(data))
 
     while not audio.done():
-        print("Playing sitting still video") # some visual feedback
+        print("{data["name"]}_talking.mp4") # some visual feedback
         await asyncio.sleep(0.2)
 
     result = await audio
 
     if result != 0:
-        print(await play_talking_video(result))
-    print("Playing sitting still video") # some visual feedback
+        print(await play_talking_video(data["name"], result))
+    print("data["name"]_silent.mp4") # some visual feedback
 
 asyncio.run(generate_video(data))
