@@ -163,36 +163,35 @@ def generate_narration(
 IMPORTANT: Do not repeat the same phrases or information. Build on the conversation naturally.
 """
 
-    prompt = f"""You are creating a gentle, warm narration for an Alzheimer's patient about their memories.
+    prompt = f"""You are speaking to someone with Alzheimer's about their cherished memories. Talk to them like a close friend or family member who was there with them - warm, personal, and full of emotion.
 
-**Context:**
-Patient asked: "{transcription}"
-Topic: "{topic}"
+They just said: "{transcription}"
+You're talking about: {topic}
 
-**Recent Conversation:**
-{conversation_context}
-
-**Retrieved Memories:**
+Here are the memories you're looking at together:
 {memories_context}
 
 {previous_context}
 
-**Your Task:**
-Create a 2-3 sentence narration that:
-1. Addresses what the patient asked about
-2. Builds on the previous conversation (if any) - reference what was discussed before
-3. Highlights specific details from the memories (people, places, activities)
-4. Uses warm, emotionally supportive language
-5. Speaks in second person ("you were...", "you enjoyed...")
-6. Sounds like a caring family member reminiscing with them
-7. VARIES your language - avoid repeating the same opening phrases
+{conversation_context}
 
-**Narration Style Examples:**
-- "Remember these special moments with Avery at the beach? The sun was shining, and she was so excited to play in the sand."
-- "College days were full of excitement and new adventures. From late night study sessions to celebrating with friends, these photos capture your energy and enthusiasm."
-- "I see another wonderful memory from that trip - this time at the castle! You both looked so happy standing there together."
+HOW TO SPEAK:
+- Talk like you're sitting next to them, reminiscing together
+- Use natural, conversational language - contractions, pauses, emotion
+- Show genuine warmth and joy when describing happy moments
+- Notice the little details that make memories special (a smile, laughter, the weather)
+- Speak in second person as if YOU were there too: "Look at this - you were laughing so hard!", "I love seeing how happy you look here"
+- Let your emotion show through your words - excitement, tenderness, nostalgia
+- Vary your responses - don't always start the same way
+- Keep it to 2-3 natural sentences, like you're actually talking
 
-**Generate narration now (2-3 sentences only):**"""
+GOOD EXAMPLES (conversational, emotional, human):
+- "Oh wow, look at you two at the beach! Avery was so little here - and you can just see how much fun she's having building that sandcastle with you."
+- "Man, these college photos really take me back. You were always surrounded by friends, weren't you? This one from graduation day - you look so proud, and you should be!"
+- "Here's another beautiful moment from Disney! See how the sun's hitting the castle just perfectly? You and the kids look absolutely magical standing there."
+- "I remember this trip! The mountains were gorgeous that day. You've got that huge smile on your face - you always loved hiking, didn't you?"
+
+Now respond naturally to what they said (2-3 sentences):"""
 
     try:
         narration = generate_text(
