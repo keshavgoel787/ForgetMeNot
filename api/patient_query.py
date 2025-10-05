@@ -121,10 +121,8 @@ def select_media_for_mode(display_mode: str, memories: List[tuple]) -> tuple[str
             return ("4-pic", images[:4])
         elif available_count == 3:
             return ("3-pic", images[:3])
-        elif available_count >= 1:
-            return ("1-pic", images[:1])
         else:
-            # No images available, fallback to video if available
+            # Less than 3 images, fallback to video
             if horizontal_videos:
                 return ("video", horizontal_videos[:1])
             elif vertical_videos:
