@@ -2,10 +2,12 @@
 ReMind - AI Memory Companion API
 Main application entry point
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
+import time
+import logging
 
 from api.transcribe import router as transcribe_router
 from api.memories import router as memories_router
@@ -19,6 +21,13 @@ load_dotenv()
 if os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 # Initialize FastAPI app
 app = FastAPI(
     title="ReMind API",
@@ -27,6 +36,26 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Add request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+
+    # Log incoming request
+    logger.info(f"➡️  {request.method} {request.url.path} - Client: {request.client.host}")
+
+    response = await call_next(request)
+
+    # Log response
+    process_time = time.time() - start_time
+    logger.info(
+        f"⬅️  {request.method} {request.url.path} - "
+        f"Status: {response.status_code} - "
+        f"Time: {process_time:.2f}s"
+    )
+
+    return response
 
 # Add CORS middleware
 app.add_middleware(
