@@ -27,16 +27,16 @@
         .app {
           display: flex;
           min-height: 100vh;
-          background: #dbe7f5; /* light blue page background */
+          background: #dbe7f5;
         }
 
-        /* navbar */
+        /* Left navbar */
         .sidebar {
           min-width: 120px;
           max-width: 180px;
           width: auto;
           padding: 16px 12px;
-          background: #a9bff0; /* bluish sidebar */
+          background: #a9bff0;
           border-right: 1px solid rgba(0,0,0,0.18);
           display: flex;
           flex-direction: column;
@@ -78,10 +78,6 @@
           justify-content: center;
           flex: 1;
         }
-        
-        .nav-bottom {
-          margin-top: auto;
-        }
 
         .nav-item {
           all: unset;
@@ -92,7 +88,7 @@
           border-radius: 10px;
           background: rgba(255,255,255,0.4);
           cursor: pointer;
-          transition: background 0.15s ease;
+          transition: all 0.15s ease;
         }
 
         .nav-item:hover {
@@ -100,52 +96,45 @@
           transform: scale(1.1);
         }
         
-        
+        /* Remember Screen - Animated Memory Interface */
         .remember-container {
           position: relative;
           width: 100%;
           height: 100%;
-          background: #1a1a1a;
+          background: #d4e6f7;
           overflow: hidden;
           display: flex;
           align-items: center;
           justify-content: center;
         }
         
+        /* Central Square */
         .central-circle {
           position: relative;
           width: 200px;
           height: 200px;
           border-radius: 40px;
-          background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
-          border: 2px solid rgba(255,255,255,0.3);
+          background: #a9bff0;
+          border: 2px solid rgba(100,100,100,0.3);
           box-shadow: 
-            0 0 20px rgba(0, 255, 255, 0.4),
-            inset 0 0 20px rgba(255, 255, 255, 0.1);
-          animation: bubble-glow 2s ease-in-out infinite alternate;
+            0 0 20px rgba(100, 150, 200, 0.3),
+            inset 0 0 20px rgba(255, 255, 255, 0.2);
           display: flex;
           align-items: center;
           justify-content: center;
         }
         
-        @keyframes borderPulse {
-          0%, 100% { 
+        @keyframes bubble-glow {
+          0% { 
             box-shadow: 
-              0 0 50px rgba(255, 0, 128, 0.3),
-              0 0 100px rgba(255, 128, 0, 0.2),
-              inset 0 0 50px rgba(255, 255, 255, 0.1);
+              0 0 20px rgba(100, 150, 200, 0.3),
+              inset 0 0 20px rgba(255, 255, 255, 0.2);
           }
-          50% { 
+          100% { 
             box-shadow: 
-              0 0 70px rgba(255, 0, 128, 0.5),
-              0 0 140px rgba(255, 128, 0, 0.3),
-              inset 0 0 70px rgba(255, 255, 255, 0.2);
+              0 0 30px rgba(100, 150, 200, 0.5),
+              inset 0 0 30px rgba(255, 255, 255, 0.3);
           }
-        }
-        
-        @keyframes rotate {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
         }
         
         /* Orbital System */
@@ -156,31 +145,71 @@
           top: 50%;
           left: 50%;
           transform: translate(-50%, -50%);
-          /* No animation here, this is a fixed container */
           pointer-events: none;
         }
         
-        .memory-bubble {
-          pointer-events: auto !important;
-          transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+        /* Memory Bubble Wrapper - handles positioning */
+        .memory-bubble-wrapper {
           position: absolute;
+          left: 50%;
+          top: 50%;
+          pointer-events: auto;
+        }
+        
+        /* Memory Bubble - handles animations */
+        .memory-bubble {
+          position: relative;
           display: flex;
           flex-direction: column;
           align-items: center;
-          pointer-events: auto !important;
           cursor: pointer;
+          transition: transform 0.3s ease-out, opacity 0.3s ease-out;
         }
-
+        
+        /* Hover animation */
+        .memory-bubble:hover {
+          transform: scale(1.1);
+        }
         
         /* Shrinking animation when bubble is clicked */
         .memory-bubble.shrinking {
           transform: scale(0.1) !important;
           opacity: 0;
         }
+        
+        /* Expanding animation for existing bubbles when new one is added */
+        .memory-bubble.expanding {
+          animation: bubble-expand 0.4s ease-out;
+        }
 
         @keyframes bubble-expand {
           0% { transform: scale(0.1); }
           100% { transform: scale(1); }
+        }
+        
+        /* Appearing animation for new bubbles */
+        .memory-bubble.appearing {
+          animation: bubble-appear 0.5s ease-out;
+        }
+
+        @keyframes bubble-appear {
+          0% { 
+            transform: scale(0.1);
+            opacity: 0;
+          }
+          100% { 
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+
+        .memory-bubble-orbit {
+          width: 100%;
+          height: 100%;
+          position: absolute;
+          top: 0;
+          left: 0;
+          animation: orbitSpin 20s linear infinite;
         }
 
         @keyframes orbitSpin {
@@ -188,47 +217,20 @@
           to { transform: rotate(360deg); }
         }
         
-        @keyframes counterRotate {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(-360deg); }
-        }
-        
         .memory-circle {
           position: relative;
           width: 60px;
           height: 60px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%);
-          border: 2px solid rgba(255,255,255,0.3);
+          background: #a9bff0;
+          border: 2px solid rgba(100,100,100,0.4);
           box-shadow: 
-            0 0 20px rgba(0, 255, 255, 0.4),
-            inset 0 0 20px rgba(255, 255, 255, 0.1);
+            0 0 20px rgba(100, 150, 200, 0.3),
+            inset 0 0 20px rgba(255, 255, 255, 0.2);
           display: flex;
           align-items: center;
           justify-content: center;
           animation: bubble-glow 2s ease-in-out infinite alternate;
-        }
-        
-        .memory-circle::before {
-          display: none;
-        }
-        
-        @keyframes particle-beam {
-          0%, 100% { opacity: 0.2; }
-          50% { opacity: 0.6; }
-        }
-        
-        @keyframes bubble-glow {
-          0% { 
-            box-shadow: 
-              0 0 20px rgba(0, 255, 255, 0.4),
-              inset 0 0 20px rgba(255, 255, 255, 0.1);
-          }
-          100% { 
-            box-shadow: 
-              0 0 30px rgba(0, 255, 255, 0.6),
-              inset 0 0 30px rgba(255, 255, 255, 0.2);
-          }
         }
         
         .memory-bubble img {
@@ -237,11 +239,16 @@
         }
         
         .memory-label {
-          color: white;
-          font-size: 12px;
+          position: absolute;
+          top: 100%;
+          left: 50%;
+          transform: translateX(-50%);
           margin-top: 8px;
+          color: #1a3a52;
+          font-size: 12px;
+          font-weight: 600;
           text-align: center;
-          font-weight: 500;
+          white-space: nowrap;
         }
                 
         /* Text Input System */
@@ -256,22 +263,22 @@
         .memory-input {
           width: 100%;
           padding: 16px 24px;
-          border: 2px solid rgba(255, 255, 255, 0.2);
+          border: 2px solid rgba(100, 100, 100, 0.3);
           border-radius: 25px;
-          background: rgba(0, 0, 0, 0.7);
-          color: white;
+          background: #ffffff;
+          color: #1a3a52;
           font-size: 16px;
           outline: none;
           transition: all 0.3s ease;
         }
         
         .memory-input:focus {
-          border-color: rgba(0, 255, 255, 0.5);
-          box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+          border-color: rgba(100, 150, 200, 0.6);
+          box-shadow: 0 0 20px rgba(100, 150, 200, 0.3);
         }
         
         .memory-input::placeholder {
-          color: rgba(255, 255, 255, 0.5);
+          color: rgba(100, 100, 100, 0.6);
         }
         
         /* Suggestions Section */
@@ -286,9 +293,10 @@
         }
         
         .suggestions-title {
-          color: rgba(255, 255, 255, 0.7);
+          color: #1a3a52;
           font-size: 14px;
           margin-right: 10px;
+          font-weight: 600;
         }
         
         .suggestion-item {
@@ -300,11 +308,6 @@
         }
         
         .suggestion-item:hover {
-          transform: scale(1.1);
-        }
-
-        
-        .memory-bubble:hover {
           transform: scale(1.1);
         }
         
@@ -324,10 +327,11 @@
         }
         
         .suggestion-label {
-          color: rgba(255, 255, 255, 0.8);
+          color: #1a3a52;
           font-size: 10px;
+          font-weight: 600;
         }
-        
+
         /* Right content area */
         .main {
           flex: 1;
@@ -338,7 +342,7 @@
         
         /* Header bar */
         .header-bar {
-          background: #c4d5f5; /* between sidebar and background color */
+          background: #c4d5f5;
           height: 80px;
           display: flex;
           align-items: center;
@@ -415,13 +419,11 @@
           
           // Function to remove a memory when clicked
           const removeMemory = (memoryId) => {
-            // Find the bubble element and add shrinking class
             const bubbleElement = document.querySelector(`[data-memory-id="${memoryId}"] .memory-bubble`);
             if (bubbleElement) {
               bubbleElement.classList.add('shrinking');
             }
             
-            // Remove from state after animation completes (0.3s)
             setTimeout(() => {
               setMemories(prevMemories => {
                 const filtered = prevMemories.filter(memory => memory.id !== memoryId);
@@ -434,25 +436,24 @@
             if (inputValue.trim() && !isAnimating) {
               setIsAnimating(true);
               const newId = Date.now();
-              const newMemory = { id: newId, text: inputValue.trim(), angle: 0 };
+              const newMemory = { id: newId, text: inputValue.trim(), angle: 0, isNew: true };
 
-              // Temporarily add "expanding" class to all existing bubbles
-              document.querySelectorAll('.memory-bubble').forEach(bubble => {
+              // Add expanding animation to all existing bubbles
+              document.querySelectorAll('.memory-bubble:not(.appearing)').forEach(bubble => {
                 bubble.classList.add('expanding');
+                setTimeout(() => bubble.classList.remove('expanding'), 400);
               });
 
               // Update memory list with evenly distributed angles
               setMemories(prevMemories => {
-                const allMemories = [...prevMemories, newMemory];
+                const allMemories = [...prevMemories.map(m => ({ ...m, isNew: false })), newMemory];
                 return redistributeAngles(allMemories);
               });
 
               setInputValue('');
-
-              // Reset animation flag after animation completes
-              setTimeout(() => setIsAnimating(false), 1000);
+              setTimeout(() => setIsAnimating(false), 500);
             }
-          };          
+          };
           
           const handleKeyPress = (e) => {
             if (e.key === 'Enter') {
@@ -467,23 +468,18 @@
             }
           };
           
-          
           const HomeScreen = () => (
             React.createElement('div', { className: 'screen active' },
               React.createElement('div', { className: 'header-bar' }, 'Dashboard'),
               React.createElement('div', { className: 'content' },
                 React.createElement('div', { className: 'cards' },
                   React.createElement('div', { className: 'card' },
-                    React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } },
-                      React.createElement('h2', null, 'Card One')
-                    ),
-                    React.createElement('p', null, 'This is the first card with some placeholder content. You can add your Google Gemini API integration here.')
+                    React.createElement('h2', null, 'Card One'),
+                    React.createElement('p', null, 'This is the first card with some placeholder content.')
                   ),
                   React.createElement('div', { className: 'card' },
-                    React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } },
-                      React.createElement('h2', null, 'Card Two')
-                    ),
-                    React.createElement('p', null, 'This is the second card where you can add more functionality for your hackathon project.')
+                    React.createElement('h2', null, 'Card Two'),
+                    React.createElement('p', null, 'This is the second card where you can add more functionality.')
                   )
                 )
               )
@@ -492,9 +488,9 @@
           
           const RememberScreen = () => {
             const suggestions = ['Brian', 'Hiker', 'Fireworks', 'Forest', 'Love', 'Park', 'Sunset'];
+            
             return React.createElement('div', { className: 'screen active' },
               React.createElement('div', { className: 'remember-container' },
-                // Central Rainbow Circle with star
                 React.createElement('div', { className: 'central-circle' },
                   React.createElement('img', {
                     src: './src/assets/fav_icon_clicked.png',
@@ -502,25 +498,17 @@
                     style: {
                       width: '80px',
                       height: '80px',
-                      filter: `drop-shadow(${Math.random() * 10 - 5}px ${Math.random() * 10 - 5}px ${Math.random() * 15 + 5}px rgba(255, 255, 255, 0.8))`
+                      filter: `drop-shadow(0px 0px 10px rgba(255, 255, 255, 0.8))`
                     }
                   })
                 ),
-                // Orbital System - force re-render with key based on memories
                 React.createElement('div', { 
                   className: 'orbit-container',
                   key: `orbit-${memories.length}-${memories.map(m => m.id).join('-')}`
                 },
-                  memories.map((memory, index) => {
-                    const n = memories.length;
-                    // Use memory.angle for even distribution
+                  memories.map((memory) => {
                     const angle = memory.angle || 0;
-                    const orbitRadius = 225; // px, so bubbles orbit at 225px from center (75% of 300px)
-                    
-                    // DEBUG: Log the angle for each memory
-                    console.log(`Memory "${memory.text}": angle=${angle}, index=${index}, total=${n}`);
-                    
-                    // Convert angle to radians and calculate x, y position
+                    const orbitRadius = 225;
                     const radian = (angle * Math.PI) / 180;
                     const x = Math.cos(radian) * orbitRadius;
                     const y = Math.sin(radian) * orbitRadius;
@@ -529,52 +517,33 @@
                       key: `${memory.id}-${angle}`,
                       className: 'memory-bubble-orbit',
                       'data-memory-id': memory.id,
-                      style: {
-                        animation: 'none'
-                      }
+                      style: { animation: 'none' }
                     },
                       React.createElement('div', {
-                        className: 'memory-bubble',
+                        className: 'memory-bubble-wrapper',
                         style: {
-                          position: 'absolute',
-                          left: '50%',
-                          top: '50%',
-                          transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`,
-                          cursor: 'pointer'
-                        },
-                        onClick: (e) => {
-                          e.stopPropagation();
-                          removeMemory(memory.id);
+                          transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`
                         }
                       },
-                        React.createElement('div', { 
-                          className: 'memory-circle'
-                        },
-                          React.createElement('img', {
-                            src: './src/assets/fav_icon_clicked.png',
-                            alt: memory.text
-                          })
-                        ),
-                        React.createElement('div', { 
-                          className: 'memory-label',
-                          style: {
-                            position: 'absolute',
-                            top: '100%',
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            marginTop: '8px',
-                            color: 'white',
-                            fontSize: '12px',
-                            fontWeight: '500',
-                            textAlign: 'center',
-                            whiteSpace: 'nowrap'
+                        React.createElement('div', {
+                          className: `memory-bubble${memory.isNew ? ' appearing' : ''}`,
+                          onClick: (e) => {
+                            e.stopPropagation();
+                            removeMemory(memory.id);
                           }
-                        }, memory.text)
+                        },
+                          React.createElement('div', { className: 'memory-circle' },
+                            React.createElement('img', {
+                              src: './src/assets/fav_icon_clicked.png',
+                              alt: memory.text
+                            })
+                          ),
+                          React.createElement('div', { className: 'memory-label' }, memory.text)
+                        )
                       )
                     );
                   })
                 ),
-                // Text Input
                 React.createElement('div', { className: 'input-container' },
                   React.createElement('input', {
                     type: 'text',
@@ -585,7 +554,6 @@
                     onKeyPress: handleKeyPress
                   })
                 ),
-                // Suggestions
                 React.createElement('div', { className: 'suggestions-section' },
                   React.createElement('div', { className: 'suggestions-title' }, 'Suggestions'),
                   suggestions.map((suggestion, index) => {
@@ -626,15 +594,11 @@
               React.createElement('div', { className: 'content' },
                 React.createElement('div', { className: 'cards' },
                   React.createElement('div', { className: 'card' },
-                    React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } },
-                      React.createElement('h2', null, 'Memory Alpha')
-                    ),
+                    React.createElement('h2', null, 'Memory Alpha'),
                     React.createElement('p', null, 'Your first memory with advanced features and functionality.')
                   ),
                   React.createElement('div', { className: 'card' },
-                    React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } },
-                      React.createElement('h2', null, 'Memory Beta')
-                    ),
+                    React.createElement('h2', null, 'Memory Beta'),
                     React.createElement('p', null, 'Second memory focusing on user experience and design.')
                   )
                 )
@@ -656,8 +620,7 @@
               React.createElement('div', { className: 'brand' },
                 React.createElement('img', { 
                   src: './src/assets/FMN_Flower.png',
-                  alt: 'ForgetMeNot Logo',
-                  title: 'ForgetMeNot Logo'
+                  alt: 'ForgetMeNot Logo'
                 })
               ),
               React.createElement('nav', { className: 'nav' },
