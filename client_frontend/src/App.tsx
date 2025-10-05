@@ -565,6 +565,16 @@ const ImagePlaygroundUI = () => {
       
       console.log('Fetching audio for text:', text);
       
+      // Determine which voice to use based on selected topic
+      let voiceName = 'therapist';
+      if (selectedTopic === 'avery') {
+        voiceName = 'avery';
+      } else if (selectedTopic === 'tyler') {
+        voiceName = 'tyler';
+      }
+      
+      console.log('Using voice:', voiceName);
+      
       const response = await fetch('https://forgetmenot-eq7i.onrender.com/text-to-speech', {
         method: 'POST',
         headers: {
@@ -572,7 +582,7 @@ const ImagePlaygroundUI = () => {
         },
         body: JSON.stringify({
           text: text,
-          name: 'therapist'
+          name: voiceName
         })
       });
 
