@@ -5,6 +5,9 @@ By combining multimodal AI, voice synthesis, and intuitive dashboards, the syste
 
 ---
 
+![Patient Portal](./Patient_Portal.png)
+
+
 ## System Overview
 
 Forget Me Not consists of three main layers:
