@@ -77,6 +77,20 @@ def get_agent_profile(agent_name: str = "Avery") -> AgentProfile:
         )
 
 
+def detect_agent_from_text(text: str) -> str:
+    """Detect which agent the user wants to talk to from transcribed text"""
+    text_lower = text.lower()
+
+    # Check for explicit agent mentions
+    if "tyler" in text_lower:
+        return "Tyler"
+    elif "avery" in text_lower:
+        return "Avery"
+
+    # Default to Avery
+    return "Avery"
+
+
 async def generate_agent_speech(text: str, voice_name: str) -> str:
     """Call TTS API to generate speech and upload to GCS"""
 
@@ -179,7 +193,14 @@ async def talk_to_agent(
         print(f"   Patient said: '{transcription}'")
         print(f"   Topic: {topic}")
 
-        # Step 2: Get agent profile
+        # Step 2: Detect which agent to use from transcription
+        detected_agent = detect_agent_from_text(transcription)
+        # Override with detected agent if different
+        if detected_agent != agent_name:
+            print(f"   🔍 Detected agent: {detected_agent} (overriding default: {agent_name})")
+            agent_name = detected_agent
+
+        # Step 3: Get agent profile
         agent = get_agent_profile(agent_name)
         print(f"   Agent: {agent.name} ({agent.voice_name})")
 
