@@ -388,12 +388,7 @@ const ImagePlaygroundUI = () => {
       console.log('📤 Sending audio query for topic:', selectedTopic);
       console.log('🔄 Converting audio format...');
       setIsLoadingAudio(true);
-      
-      // For Avery/Tyler, keep avatar visible. For others, hide content during transition
-      const isPersonTopic = selectedTopic === 'avery' || selectedTopic === 'tyler';
-      if (!isPersonTopic) {
-        setShowContent(false);
-      }
+      setShowContent(false);
       
       // Convert WebM to WAV for better compatibility
       const wavBlob = await convertWebMToMp3(audioBlob);
@@ -403,35 +398,22 @@ const ImagePlaygroundUI = () => {
       formData.append('audio_file', wavBlob, 'patient_audio.wav');
       formData.append('topic', selectedTopic.charAt(0).toUpperCase() + selectedTopic.slice(1).toLowerCase());
       
-      // Use different endpoints for person topics (Avery/Tyler) vs other topics
-      let endpoint: string;
-      if (selectedTopic === 'avery') {
-        endpoint = 'https://forgetmenot-p4pb.onrender.com/agent/talk/avery';
-        console.log('🎭 Using Avery agent endpoint');
-      } else if (selectedTopic === 'tyler') {
-        endpoint = 'https://forgetmenot-p4pb.onrender.com/agent/talk/tyler';
-        console.log('🎭 Using Tyler agent endpoint');
-      } else {
-        endpoint = 'https://forgetmenot-p4pb.onrender.com/patient/query';
-        console.log('🔍 Using patient query endpoint');
-      }
-      
-      const response = await fetch(endpoint, {
+      const response = await fetch('https://forgetmenot-p4pb.onrender.com/patient/query', {
         method: 'POST',
         body: formData
       });
       
-      console.log('📥 API response status:', response.status);
+      console.log('📥 Patient query response status:', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ API request failed:', response.status, errorText);
+        console.error('❌ Patient query failed:', response.status, errorText);
         setIsLoadingAudio(false);
         return;
       }
       
       const data = await response.json();
-      console.log('✅ API response:', data);
+      console.log('✅ Patient query response:', data);
       
       // Check for error responses
       if (data.detail) {
@@ -440,38 +422,22 @@ const ImagePlaygroundUI = () => {
         return;
       }
       
-      // Handle agent conversation response (Avery/Tyler)
-      if (isPersonTopic) {
-        // Agent API returns: { agent_name, text, audio_url, personality_note }
-        if (!data.text || !data.audio_url) {
-          console.error('❌ Agent API response missing required fields:', data);
-          setIsLoadingAudio(false);
-          return;
-        }
-        
-        console.log('🎭 Agent response:', data.agent_name, '-', data.personality_note);
-        
-        // Play audio directly from the URL
-        await playAudioFromUrl(data.audio_url);
-        
-      } else {
-        // Handle regular patient query response
-        if (!data.text || !data.media || data.media.length === 0) {
-          console.error('❌ API response missing required fields:', data);
-          setIsLoadingAudio(false);
-          return;
-        }
-        
-        // Update display with new content
-        setIsTransitioning(true);
-        setPetalsExplode(false);
-        
-        setTimeout(() => {
-          setDisplayMode(data.displayMode || '4-pic');
-          setCurrentMedia(data.media);
-          fetchAndPlayAudio(data.text);
-        }, 500);
+      // Validate required fields
+      if (!data.text || !data.media || data.media.length === 0) {
+        console.error('❌ API response missing required fields:', data);
+        setIsLoadingAudio(false);
+        return;
       }
+      
+      // Update display with new content
+      setIsTransitioning(true);
+      setPetalsExplode(false);
+      
+      setTimeout(() => {
+        setDisplayMode(data.displayMode || '4-pic');
+        setCurrentMedia(data.media);
+        fetchAndPlayAudio(data.text);
+      }, 500);
       
     } catch (error) {
       console.error('❌ Error sending audio query:', error);
@@ -784,63 +750,47 @@ const ImagePlaygroundUI = () => {
     // Generate background music for this topic
     generateAndPlayBackgroundMusic(topic);
     
-    // Check if this is a person topic (Avery/Tyler) - these use agent conversation
-    const isPersonTopic = topic === 'avery' || topic === 'tyler';
+    // Fetch from API first (works for all topics including Avery/Tyler)
+    console.log('🔵 Calling fetchExperienceByTopic for:', topic);
+    const apiMemoryData = await fetchExperienceByTopic(topic);
+    console.log('🔵 API Memory Data received:', apiMemoryData);
     
-    if (isPersonTopic) {
-      // For Avery/Tyler, just show their avatar and wait for user to talk
-      console.log('🎭 Setting up agent conversation for:', topic);
+    if (apiMemoryData) {
+      console.log('✅ Using API data for topic:', topic);
+      setApiMemory(apiMemoryData);
+      setUseApiMemory(true);
       
-      // Wait for start screen to fade out, then show avatar
+      // Wait for start screen to fade out (1 second), then show flower
       setTimeout(() => {
-        setShowContent(true);
-        setIsAudioReady(true); // Enable mic button
-        console.log('✅ Agent ready. Press mic to start conversation.');
+        setIsTransitioning(true);
+        setPetalsExplode(false);
+        
+        // Load content from API
+        setDisplayMode(apiMemoryData.displayMode);
+        setCurrentMedia(apiMemoryData.media);
+        fetchAndPlayAudio(apiMemoryData.text);
       }, 1000);
-      
     } else {
-      // For other topics, fetch content from API as before
-      console.log('🔵 Calling fetchExperienceByTopic for:', topic);
-      const apiMemoryData = await fetchExperienceByTopic(topic);
-      console.log('🔵 API Memory Data received:', apiMemoryData);
-      
-      if (apiMemoryData) {
-        console.log('✅ Using API data for topic:', topic);
-        setApiMemory(apiMemoryData);
-        setUseApiMemory(true);
+      console.log('⚠️ API failed, falling back to mock data for topic:', topic);
+      // Fallback to mock data if API fails
+      setUseApiMemory(false);
+      const topicMemories = memories.filter(m => m.topic.toLowerCase() === topic.toLowerCase());
+      if (topicMemories.length > 0) {
+        const memory = topicMemories[0];
+        if (!memory) return;
+        
+        console.log('📁 Using mock data:', memory.id);
         
         // Wait for start screen to fade out (1 second), then show flower
         setTimeout(() => {
           setIsTransitioning(true);
           setPetalsExplode(false);
           
-          // Load content from API
-          setDisplayMode(apiMemoryData.displayMode);
-          setCurrentMedia(apiMemoryData.media);
-          fetchAndPlayAudio(apiMemoryData.text);
+          // Load content after flower appears
+          setDisplayMode(memory.displayMode);
+          setCurrentMedia(memory.media);
+          fetchAndPlayAudio(memory.text);
         }, 1000);
-      } else {
-        console.log('⚠️ API failed, falling back to mock data for topic:', topic);
-        // Fallback to mock data if API fails
-        setUseApiMemory(false);
-        const topicMemories = memories.filter(m => m.topic.toLowerCase() === topic.toLowerCase());
-        if (topicMemories.length > 0) {
-          const memory = topicMemories[0];
-          if (!memory) return;
-          
-          console.log('📁 Using mock data:', memory.id);
-          
-          // Wait for start screen to fade out (1 second), then show flower
-          setTimeout(() => {
-            setIsTransitioning(true);
-            setPetalsExplode(false);
-            
-            // Load content after flower appears
-            setDisplayMode(memory.displayMode);
-            setCurrentMedia(memory.media);
-            fetchAndPlayAudio(memory.text);
-          }, 1000);
-        }
       }
     }
   };
