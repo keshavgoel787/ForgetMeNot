@@ -20,10 +20,14 @@ import zipfile
 import io
 import requests
 from pathlib import Path
-from memory_to_people import MemoryPeopleExtractor
-from edit_pictures_based_on_json import PeopleFolderEditor
-from text_context_per_memory import MemoryContextAnalyzer
 from dotenv import load_dotenv
+
+# Lazy imports for heavy dependencies (only needed for face extraction endpoints)
+# These are imported inside the endpoint functions to avoid errors when deploying
+# to environments without opencv, face_recognition, etc.
+# from memory_to_people import MemoryPeopleExtractor
+# from edit_pictures_based_on_json import PeopleFolderEditor
+# from text_context_per_memory import MemoryContextAnalyzer
 
 # Load environment variables
 load_dotenv()
@@ -104,6 +108,15 @@ async def extract_faces(data_zip: UploadFile = File(...)):
     4. Sample 16 random faces per person
     5. Return as ZIP
     """
+    # Import heavy dependencies only when this endpoint is called
+    try:
+        from memory_to_people import MemoryPeopleExtractor
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="Face extraction not available. This endpoint requires opencv and face_recognition libraries."
+        )
+    
     session_id = f"session_{os.urandom(8).hex()}"
     session_dir = WORK_DIR / session_id
     session_dir.mkdir(parents=True, exist_ok=True)
@@ -193,6 +206,17 @@ async def generate_context(
     4. Generate AI context with people identification
     5. Return complete annotated data
     """
+    # Import heavy dependencies only when this endpoint is called
+    try:
+        from memory_to_people import MemoryPeopleExtractor
+        from edit_pictures_based_on_json import PeopleFolderEditor
+        from text_context_per_memory import MemoryContextAnalyzer
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="Context generation not available. This endpoint requires opencv, face_recognition, and other heavy libraries."
+        )
+    
     session_id = f"session_{os.urandom(8).hex()}"
     session_dir = WORK_DIR / session_id
     session_dir.mkdir(parents=True, exist_ok=True)
