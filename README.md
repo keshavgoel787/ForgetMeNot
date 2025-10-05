@@ -61,15 +61,7 @@ Forget Me Not consists of three main layers:
 | **AI & Processing** | Google AI Platform, ElevenLabs, OpenCV |
 | **Data & Cloud** | Snowflake, Google Cloud (Buckets, BigQuery) |
 | **Integration** | REST APIs between FastAPI servers |
-
----
-
-## Future Enhancements
-
-- Emotion recognition using voice and facial analysis  
-- Virtual reality integration for immersive sessions  
-- Advanced analytics for cognitive progress tracking  
-- HIPAA-compliant encryption and role-based access  
+ 
 
 ---
 
