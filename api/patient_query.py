@@ -26,6 +26,7 @@ from scripts.lib.gemini_client import generate_text
 from api.schemas import PatientQueryResponse
 from api.intent_classifier import classify_intent_and_media
 from api.session_manager import session_manager
+from api.conversation_history import conversation_history
 import google.generativeai as genai
 
 router = APIRouter(prefix="/patient", tags=["Patient"])
@@ -144,8 +145,27 @@ def select_media_for_mode(display_mode: str, memories: List[tuple]) -> tuple[str
     return (display_mode, [])
 
 
-def generate_narration(topic: str, memories_context: str, transcription: str) -> str:
-    """Generate warm narration text using Gemini"""
+def generate_narration(
+    topic: str,
+    memories_context: str,
+    transcription: str,
+    patient_id: str
+) -> str:
+    """Generate warm narration text using Gemini with conversation history"""
+
+    # Get conversation history
+    conversation_context = conversation_history.get_formatted_history(patient_id, topic, max_turns=6)
+    previous_responses = conversation_history.get_agent_previous_responses(patient_id, topic, max_turns=3)
+
+    # Build context about what's been said before
+    previous_context = ""
+    if previous_responses:
+        previous_context = f"""
+**Previous responses you've given (DO NOT REPEAT THESE):**
+{chr(10).join(f'- "{response}"' for response in previous_responses)}
+
+IMPORTANT: Do not repeat the same phrases or information. Build on the conversation naturally.
+"""
 
     prompt = f"""You are creating a gentle, warm narration for an Alzheimer's patient about their memories.
 
@@ -153,20 +173,28 @@ def generate_narration(topic: str, memories_context: str, transcription: str) ->
 Patient asked: "{transcription}"
 Topic: "{topic}"
 
+**Recent Conversation:**
+{conversation_context}
+
 **Retrieved Memories:**
 {memories_context}
+
+{previous_context}
 
 **Your Task:**
 Create a 2-3 sentence narration that:
 1. Addresses what the patient asked about
-2. Highlights specific details from the memories (people, places, activities)
-3. Uses warm, emotionally supportive language
-4. Speaks in second person ("you were...", "you enjoyed...")
-5. Sounds like a caring family member reminiscing with them
+2. Builds on the previous conversation (if any) - reference what was discussed before
+3. Highlights specific details from the memories (people, places, activities)
+4. Uses warm, emotionally supportive language
+5. Speaks in second person ("you were...", "you enjoyed...")
+6. Sounds like a caring family member reminiscing with them
+7. VARIES your language - avoid repeating the same opening phrases
 
 **Narration Style Examples:**
 - "Remember these special moments with Avery at the beach? The sun was shining, and she was so excited to play in the sand."
 - "College days were full of excitement and new adventures. From late night study sessions to celebrating with friends, these photos capture your energy and enthusiasm."
+- "I see another wonderful memory from that trip - this time at the castle! You both looked so happy standing there together."
 
 **Generate narration now (2-3 sentences only):**"""
 
@@ -174,7 +202,7 @@ Create a 2-3 sentence narration that:
         narration = generate_text(
             prompt,
             model_name="gemini-2.5-flash",
-            temperature=0.8,
+            temperature=0.9,  # Higher temperature for more variety
             max_tokens=200
         )
         return narration
@@ -275,14 +303,20 @@ async def patient_query(
             # Step 5.5: Mark selected media as shown
             session_manager.mark_as_shown(patient_id, topic, media_urls)
 
-            # Step 6: Generate narration (if not agent mode)
+            # Step 6: Save patient's question to conversation history
+            conversation_history.add_turn(patient_id, topic, "patient", transcription)
+
+            # Step 7: Generate narration (if not agent mode)
             narration_text = None
             if adjusted_mode != "agent":
                 memories_context = format_memories_for_gemini(unseen_memories[:5])
-                narration_text = generate_narration(topic, memories_context, transcription)
+                narration_text = generate_narration(topic, memories_context, transcription, patient_id)
                 print(f"💬 Narration: {narration_text}")
 
-            # Step 7: Return response
+                # Save agent's response to conversation history
+                conversation_history.add_turn(patient_id, topic, "agent", narration_text)
+
+            # Step 8: Return response
             return PatientQueryResponse(
                 topic=topic,
                 text=narration_text,
@@ -355,12 +389,18 @@ async def patient_query_test(
             # Mark selected media as shown
             session_manager.mark_as_shown(patient_id, topic, media_urls)
 
+            # Save patient's question to conversation history
+            conversation_history.add_turn(patient_id, topic, "patient", transcription)
+
             # Generate narration (if not agent mode)
             narration_text = None
             if adjusted_mode != "agent":
                 memories_context = format_memories_for_gemini(unseen_memories[:5])
-                narration_text = generate_narration(topic, memories_context, transcription)
+                narration_text = generate_narration(topic, memories_context, transcription, patient_id)
                 print(f"💬 Narration: {narration_text}")
+
+                # Save agent's response to conversation history
+                conversation_history.add_turn(patient_id, topic, "agent", narration_text)
 
             return PatientQueryResponse(
                 topic=topic,
@@ -442,19 +482,88 @@ async def get_session_stats(patient_id: str, topic: str):
 
 
 @router.post("/session/reset")
-async def reset_session(patient_id: str, topic: Optional[str] = None):
+async def reset_session(
+    patient_id: str,
+    topic: Optional[str] = None,
+    reset_conversation: bool = True
+):
     """
-    **Reset session** - Clear shown memories to start fresh
+    **Reset session** - Clear shown memories and conversation history
 
     Example:
     ```
-    POST /patient/session/reset?patient_id=patient_123&topic=disney
+    POST /patient/session/reset?patient_id=patient_123&topic=disney&reset_conversation=true
     ```
     """
     session_manager.reset_session(patient_id, topic)
+
+    if reset_conversation:
+        conversation_history.reset_conversation(patient_id, topic)
+
     return {
         "status": "success",
-        "message": f"Session reset for patient {patient_id}" + (f" topic {topic}" if topic else " (all topics)")
+        "message": f"Session reset for patient {patient_id}" + (f" topic {topic}" if topic else " (all topics)"),
+        "conversation_reset": reset_conversation
+    }
+
+
+@router.get("/conversation/history")
+async def get_conversation_history(patient_id: str, topic: str, max_turns: int = 20):
+    """
+    **Get conversation history** - View recent conversation
+
+    Example:
+    ```
+    GET /patient/conversation/history?patient_id=patient_123&topic=disney&max_turns=10
+    ```
+    """
+    history = conversation_history.get_history(patient_id, topic, max_turns)
+
+    return {
+        "patient_id": patient_id,
+        "topic": topic,
+        "total_turns": len(history),
+        "conversation": [
+            {
+                "timestamp": turn.timestamp.isoformat(),
+                "role": turn.role,
+                "message": turn.message
+            }
+            for turn in history
+        ]
+    }
+
+
+@router.get("/conversation/stats")
+async def get_conversation_stats(patient_id: str, topic: str):
+    """
+    **Get conversation statistics** - Overview of conversation
+
+    Example:
+    ```
+    GET /patient/conversation/stats?patient_id=patient_123&topic=disney
+    ```
+    """
+    stats = conversation_history.get_conversation_stats(patient_id, topic)
+    return stats
+
+
+@router.get("/conversation/export")
+async def export_conversation(patient_id: str, topic: str):
+    """
+    **Export conversation** - Download full conversation as JSON
+
+    Example:
+    ```
+    GET /patient/conversation/export?patient_id=patient_123&topic=disney
+    ```
+    """
+    exported = conversation_history.export_conversation(patient_id, topic)
+
+    return {
+        "patient_id": patient_id,
+        "topic": topic,
+        "conversation": exported
     }
 
 
