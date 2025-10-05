@@ -38,6 +38,6 @@ async def generate_video(data: dict):
 
     if result != 0:
         print(await play_talking_video(result))
-        print("Playing sitting still video") # some visual feedback
+    print("Playing sitting still video") # some visual feedback
 
 asyncio.run(generate_video(data))
