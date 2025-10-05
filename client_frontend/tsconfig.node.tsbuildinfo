@@ -1,1 +1,1 @@
-{"root":["./src/App.tsx","./src/main.tsx","./src/components/HomeScreen.tsx","./src/components/MyMemoriesScreen.tsx","./src/components/RememberScreen.tsx","./src/components/Sidebar.tsx","./src/types/index.ts","./Website/App.tsx","./Website/components/Card.tsx"],"version":"5.9.3"}
+{"root":["./src/App.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/HomeScreen.tsx","./src/components/MyMemoriesScreen.tsx","./src/components/RememberScreen.tsx","./src/components/Sidebar.tsx","./src/types/index.ts","./Website/App.tsx","./Website/components/Card.tsx"],"version":"5.9.3"}
