@@ -36,7 +36,12 @@ The system consists of three main components:
   - Text-to-Speech: ElevenLabs voice synthesis
   - Lip-sync: Gooey.AI integration for video generation with synchronized audio
 
-### 4. **Snowflake Memory Vault**
+### 4. **Client Frontend (client_frontend/)**
+- **React + TypeScript + Vite**: Modern web interface for patient/caregiver interaction
+- **Build System**: Vite with TypeScript support, ESLint for code quality
+- **Purpose**: User interface for memory replay and interaction with the ReMind platform
+
+### 5. **Snowflake Memory Vault**
 - **Central database**: Stores all memory clips with multimodal embeddings
 - **Schema** (`MEMORY_VAULT` table):
   ```sql
@@ -110,6 +115,27 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```bash
 # Start main FastAPI app
 uvicorn main:app --reload
+```
+
+### Client Frontend (client_frontend/)
+
+```bash
+cd client_frontend
+
+# Install dependencies
+npm install
+
+# Run development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+
+# Lint code
+npm run lint
 ```
 
 ## Environment Setup
@@ -210,6 +236,7 @@ with SnowflakeClient() as client:
 - **scripts/**: Production data pipeline for GCS → Snowflake
 - **processing_script/**: One-time processing to generate context from raw videos
 - **api_server/**: REST API for memory interaction (transcription, TTS, lip-sync)
+- **client_frontend/**: React + TypeScript frontend application (Vite build system)
 - **api/**: Additional API routers (included in main.py)
 - **lib/**: Shared utilities (config, Snowflake client)
 - **data/**: Generated metadata CSV files

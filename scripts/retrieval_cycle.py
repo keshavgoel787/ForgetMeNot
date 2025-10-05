@@ -143,7 +143,7 @@ def generate_simple_summary(query: str, memories: list) -> str:
     return summary
 
 
-def generate_answer_with_gemini(query: str, memories_context: str, memories: list, model_name: str = "gemini-pro") -> str:
+def generate_answer_with_gemini(query: str, memories_context: str, memories: list, model_name: str = "models/gemini-2.5-flash") -> str:
     """
     Use Gemini to synthesize a natural answer from retrieved memories.
 
@@ -157,28 +157,27 @@ def generate_answer_with_gemini(query: str, memories_context: str, memories: lis
     """
     print(f"🤖 Generating answer with {model_name}...\n")
 
-    prompt = f"""You are ReMind, an AI memory companion helping someone recall their personal memories.
-You have been given some memory clips that match their question. Your job is to synthesize a warm,
-natural answer based on these memories.
+    system_style = (
+        "You are an empathetic memory-care companion. "
+        "Be gentle, concrete, and encouraging. Prefer short, warm sentences. "
+        "Cite details only from provided context. "
+        "If unsure, ask a kind clarification question."
+    )
 
-User's Question: "{query}"
-
-Retrieved Memories:
-{memories_context}
-
-Instructions:
-1. Answer the user's question directly based on the memories provided
-2. Be conversational and warm, as if helping someone remember
-3. Mention specific details from the memories (what they ate, who was there, what happened)
-4. If multiple memories are relevant, weave them together naturally
-5. Keep it concise but informative (2-4 sentences)
-6. If the memories don't fully answer the question, acknowledge what you can see and be honest about what's not shown
-
-Answer:"""
+    prompt = (
+        f"{system_style}\n\n"
+        f"User asked: \"{query}\"\n\n"
+        f"Relevant memory snippets:\n{memories_context}\n\n"
+        f"Task:\n"
+        f"1) Summarize what happened, grounded in the snippets.\n"
+        f"2) Mention specific details (foods, places, people) when present.\n"
+        f"3) Offer a gentle follow-up like \"Would you like to see the video?\"\n"
+        f"4) Keep it under 120 words.\n"
+    )
 
     try:
         # Try different model names based on what's available
-        model_names_to_try = [model_name, "models/gemini-pro", "models/gemini-1.5-pro", "models/gemini-1.5-flash"]
+        model_names_to_try = [model_name, "models/gemini-2.5-flash", "models/gemini-2.5-pro", "models/gemini-2.0-flash"]
 
         last_error = None
         for model_to_try in model_names_to_try:
@@ -191,7 +190,11 @@ Answer:"""
                         max_output_tokens=300,
                     )
                 )
-                return response.text
+                # Access response text safely
+                if response.candidates:
+                    return response.candidates[0].content.parts[0].text
+                else:
+                    raise Exception("No response generated")
             except Exception as e:
                 last_error = e
                 continue

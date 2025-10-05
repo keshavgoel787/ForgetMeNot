@@ -10,7 +10,7 @@ class MemoryContextAnalyzer:
     def __init__(self, api_key: str, people_path: str = "pre_processed/data/people"):
         """Initialize the analyzer with Gemini API key"""
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        self.model = genai.GenerativeModel('models/gemini-2.5-flash')
         self.people_path = Path(people_path)
         
         # Supported file extensions
