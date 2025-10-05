@@ -215,9 +215,9 @@ async def talk_to_agent(
         else:
             print(f"   No specific memories found - general conversation")
 
-        # Step 4: Get conversation history
+        # Step 4: Get conversation history (per agent)
         conversation_context = conversation_history.get_formatted_history(
-            patient_id, f"agent_{topic}", max_turns=5
+            patient_id, f"agent_{agent.name.lower()}", max_turns=5
         )
 
         # Step 5: Generate response with Avery's personality
@@ -260,9 +260,9 @@ Respond as {agent.name} (2-3 sentences):"""
         audio_url = await generate_agent_speech(response_text, agent.voice_name)
         print(f"   🔊 Audio generated: {audio_url}")
 
-        # Step 7: Save to conversation history
-        conversation_history.add_turn(patient_id, f"agent_{topic}", "patient", transcription)
-        conversation_history.add_turn(patient_id, f"agent_{topic}", "agent", response_text)
+        # Step 7: Save to conversation history (per agent)
+        conversation_history.add_turn(patient_id, f"agent_{agent.name.lower()}", "patient", transcription)
+        conversation_history.add_turn(patient_id, f"agent_{agent.name.lower()}", "agent", response_text)
 
         return AgentResponse(
             agent_name=agent.name,
@@ -279,6 +279,36 @@ Respond as {agent.name} (2-3 sentences):"""
         # Cleanup temporary audio file
         if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
+
+
+@router.post("/talk/avery", response_model=AgentResponse)
+async def talk_to_avery(
+    audio_file: UploadFile = File(..., description="MP3 audio file from patient"),
+    topic: str = Form(default="general", description="Conversation topic"),
+    patient_id: str = Form(default="default_patient", description="Patient ID")
+):
+    """
+    **Talk to Avery** - Direct route for Avery conversations
+
+    Click on Avery's portrait to start chatting with her warm, empathetic personality.
+    """
+    # Call the main talk endpoint with agent_name fixed to "Avery"
+    return await talk_to_agent(audio_file, topic, patient_id, agent_name="Avery")
+
+
+@router.post("/talk/tyler", response_model=AgentResponse)
+async def talk_to_tyler(
+    audio_file: UploadFile = File(..., description="MP3 audio file from patient"),
+    topic: str = Form(default="general", description="Conversation topic"),
+    patient_id: str = Form(default="default_patient", description="Patient ID")
+):
+    """
+    **Talk to Tyler** - Direct route for Tyler conversations
+
+    Click on Tyler's portrait to start chatting with his energetic, adventurous personality.
+    """
+    # Call the main talk endpoint with agent_name fixed to "Tyler"
+    return await talk_to_agent(audio_file, topic, patient_id, agent_name="Tyler")
 
 
 @router.get("/profile/{agent_name}")
