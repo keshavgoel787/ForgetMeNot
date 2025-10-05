@@ -11,6 +11,7 @@ import logging
 
 from api.experiences import router as therapist_router
 from api.patient_query import router as patient_router
+from api.patient_query_optimized import router as patient_fast_router
 from api.metadata import router as admin_metadata_router
 from api.upload import router as admin_upload_router
 
@@ -60,7 +61,12 @@ async def log_requests(request: Request, call_next):
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure based on your frontend domain
+    allow_origins=[
+        "https://forgetmenotclient.onrender.com",
+        "https://forget-me-not.tech",
+        "http://localhost:5173",  # Local development
+        "http://localhost:3000",  # Alternative local port
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,6 +75,7 @@ app.add_middleware(
 # Include routers - Organized by Therapist → Admin → Patient
 app.include_router(therapist_router)
 app.include_router(patient_router)
+app.include_router(patient_fast_router)  # Optimized endpoints
 app.include_router(admin_metadata_router)
 app.include_router(admin_upload_router)
 
