@@ -35,13 +35,14 @@ load_dotenv()
 
 app = FastAPI(title="ForgetMeNot API", version="1.0.0")
 
-# Enable CORS
+# Enable CORS - Allow all origins, methods, and headers
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Temporary working directory

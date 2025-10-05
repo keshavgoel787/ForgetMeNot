@@ -13,6 +13,10 @@ import ski1 from './testdata/ski1.json' with { type: 'json' };
 import football1 from './testdata/football1.json' with { type: 'json' };
 import tyler1 from './testdata/tyler1.json' with { type: 'json' };
 
+// Import avatar still images
+import averyWaiting from './avatar_still/avery_waiting.png';
+import tylerWaiting from './avatar_still/tyler_waiting.png';
+
 interface Memory {
   id: string;
   topic: string;
@@ -889,9 +893,83 @@ const ImagePlaygroundUI = () => {
         )}
       </AnimatePresence>
 
+      {/* Person Avatar - Conversational View */}
+      <AnimatePresence>
+        {showContent && !isTransitioning && selectedTopic && (selectedTopic === 'avery' || selectedTopic === 'tyler') && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 10,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '20px',
+              pointerEvents: 'none'
+            }}
+          >
+            {/* Avatar Portrait */}
+            <div style={{
+              width: '400px',
+              height: '500px',
+              borderRadius: '24px',
+              overflow: 'hidden',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4)',
+              border: '4px solid rgba(255, 255, 255, 0.2)',
+              backdropFilter: 'blur(10px)',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)'
+            }}>
+              <img 
+                src={selectedTopic === 'avery' ? averyWaiting : tylerWaiting}
+                alt={selectedTopic === 'avery' ? 'Avery' : 'Tyler'}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center'
+                }}
+              />
+            </div>
+
+            {/* Person Name Label */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.6 }}
+              style={{
+                padding: '12px 32px',
+                borderRadius: '16px',
+                background: 'rgba(255, 255, 255, 0.15)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)'
+              }}
+            >
+              <span style={{
+                color: 'white',
+                fontSize: '24px',
+                fontWeight: '600',
+                letterSpacing: '0.5px',
+                textShadow: '0 2px 10px rgba(0, 0, 0, 0.3)'
+              }}>
+                {selectedTopic.charAt(0).toUpperCase() + selectedTopic.slice(1)}
+              </span>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <AnimatePresence mode="wait">
-          {showContent && (
+          {showContent && selectedTopic !== 'avery' && selectedTopic !== 'tyler' && (
             <motion.div
               key={`content-${currentMemoryIndex}`}
               initial={{ opacity: 0, scale: 0.98 }}
