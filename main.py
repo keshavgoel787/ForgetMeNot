@@ -91,7 +91,8 @@ async def root():
                 "query": "POST /patient/query - Ask questions (6-mode AI response)",
                 "query_test": "POST /patient/query-test - Test query without audio",
                 "view_experience": "GET /patient/experience/{id} - View assigned experience",
-                "list_experiences": "GET /patient/experiences - List available experiences"
+                "list_experiences": "GET /patient/experiences - List available experiences",
+                "get_by_topic": "GET /patient/experience/topic/{topic} - Get experience by topic (random non-agent display)"
             },
             "admin": {
                 "build_metadata": "POST /admin/metadata/build - Build metadata from GCS",

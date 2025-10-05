@@ -16,6 +16,7 @@ sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'script
 from scripts.lib.snowflake_client import SnowflakeClient
 from scripts.retrieval_cycle import search_memories_by_query, generate_answer_with_gemini, format_memories_for_gemini
 from api.schemas import MemoryResult
+import json
 
 # In-memory storage for experiences (use Redis/DB in production)
 experiences = {}
@@ -141,7 +142,7 @@ async def create_experience(request: CreateExperienceRequest):
         all_narratives = "\n".join([s.ai_narrative for s in scene_results])
         overall_narrative = f"Here are your memories about {request.title}:\n\n{all_narratives}"
 
-        # Store experience
+        # Store experience in Snowflake
         experience_data = {
             "experience_id": experience_id,
             "title": request.title,
@@ -152,6 +153,28 @@ async def create_experience(request: CreateExperienceRequest):
             "created_at": timestamp
         }
 
+        # Insert into Snowflake (use TO_VARIANT for JSON data)
+        insert_query = """
+        INSERT INTO THERAPIST_EXPERIENCES (
+            experience_id, title, general_context, experience_data, total_memories, created_at
+        )
+        SELECT %s, %s, %s, PARSE_JSON(%s), %s, %s
+        """
+
+        client.cursor.execute(
+            insert_query,
+            (
+                experience_id,
+                request.title,
+                request.general_context,
+                json.dumps(experience_data),
+                total_memories,
+                timestamp
+            )
+        )
+        client.commit()
+
+        # Keep in memory for backward compatibility
         experiences[experience_id] = experience_data
 
         return ExperienceResponse(

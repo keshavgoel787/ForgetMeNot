@@ -15,6 +15,8 @@ from typing import Optional, List, Dict
 import tempfile
 import os
 import sys
+import random
+import json
 
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts'))
 
@@ -52,15 +54,24 @@ Instructions:
 Provide only the transcription:"""
 
         response = model.generate_content([audio_file, prompt])
+
+        # Extract text from response
+        transcription = response.candidates[0].content.parts[0].text
+
         genai.delete_file(audio_file.name)
 
-        return response.text.strip()
+        return transcription.strip()
     except Exception as e:
         raise Exception(f"Transcription failed: {str(e)}")
 
 
-def select_media_for_mode(display_mode: str, memories: List[tuple]) -> List[str]:
-    """Select appropriate media URLs based on display mode"""
+def select_media_for_mode(display_mode: str, memories: List[tuple]) -> tuple[str, List[str]]:
+    """
+    Select appropriate media URLs based on display mode and available images.
+    Adjusts display mode if not enough images are available.
+
+    Returns: (adjusted_display_mode, media_urls)
+    """
     images = []
     horizontal_videos = []
     vertical_videos = []
@@ -76,22 +87,40 @@ def select_media_for_mode(display_mode: str, memories: List[tuple]) -> List[str]
             else:
                 horizontal_videos.append(file_url)
 
-    # Select based on mode
-    if display_mode == "4-pic":
-        return images[:4]
-    elif display_mode == "3-pic":
-        return images[:3]
-    elif display_mode == "5-pic":
-        return images[:5]
+    # Handle photo modes - adjust based on available images
+    if display_mode in ["4-pic", "3-pic", "5-pic"]:
+        available_count = len(images)
+
+        # Adjust display mode based on what's actually available
+        if available_count >= 5:
+            adjusted_mode = "5-pic" if display_mode == "5-pic" else display_mode
+            return (adjusted_mode, images[:5] if adjusted_mode == "5-pic" else images[:int(display_mode[0])])
+        elif available_count == 4:
+            return ("4-pic", images[:4])
+        elif available_count == 3:
+            return ("3-pic", images[:3])
+        elif available_count == 2:
+            return ("2-pic", images[:2])
+        elif available_count == 1:
+            return ("1-pic", images[:1])
+        else:
+            # No images available, fallback to video if available
+            if horizontal_videos:
+                return ("video", horizontal_videos[:1])
+            elif vertical_videos:
+                return ("vertical-video", vertical_videos[:1])
+            return (display_mode, [])
+
+    # Video modes
     elif display_mode == "video":
-        return horizontal_videos[:1] if horizontal_videos else (images[:1] if images else [])
+        return (display_mode, horizontal_videos[:1] if horizontal_videos else (images[:1] if images else []))
     elif display_mode == "vertical-video":
-        return vertical_videos[:1] if vertical_videos else (horizontal_videos[:1] if horizontal_videos else [])
+        return (display_mode, vertical_videos[:1] if vertical_videos else (horizontal_videos[:1] if horizontal_videos else []))
     elif display_mode == "agent":
         # Agent mode will generate lip-sync video - placeholder for now
-        return ["https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"]
+        return (display_mode, ["https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"])
 
-    return []
+    return (display_mode, [])
 
 
 def generate_narration(topic: str, memories_context: str, transcription: str) -> str:
@@ -208,12 +237,13 @@ async def patient_query(
                     detail=f"No memories found for topic: {topic}"
                 )
 
-            # Step 5: Select media based on display mode
-            media_urls = select_media_for_mode(display_mode, memories)
+            # Step 5: Select media based on display mode (adjusts mode if needed)
+            adjusted_mode, media_urls = select_media_for_mode(display_mode, memories)
+            print(f"📸 Adjusted Mode: {adjusted_mode} (from {display_mode}) - {len(media_urls)} media")
 
             # Step 6: Generate narration (if not agent mode)
             narration_text = None
-            if display_mode != "agent":
+            if adjusted_mode != "agent":
                 memories_context = format_memories_for_gemini(memories[:5])
                 narration_text = generate_narration(topic, memories_context, transcription)
                 print(f"💬 Narration: {narration_text}")
@@ -222,7 +252,7 @@ async def patient_query(
             return PatientQueryResponse(
                 topic=topic,
                 text=narration_text,
-                displayMode=display_mode,
+                displayMode=adjusted_mode,
                 media=media_urls
             )
 
@@ -274,12 +304,13 @@ async def patient_query_test(
                     detail=f"No memories found for topic: {topic}"
                 )
 
-            # Select media
-            media_urls = select_media_for_mode(display_mode, memories)
+            # Select media (adjusts mode if needed)
+            adjusted_mode, media_urls = select_media_for_mode(display_mode, memories)
+            print(f"📸 Adjusted Mode: {adjusted_mode} (from {display_mode}) - {len(media_urls)} media")
 
             # Generate narration (if not agent mode)
             narration_text = None
-            if display_mode != "agent":
+            if adjusted_mode != "agent":
                 memories_context = format_memories_for_gemini(memories[:5])
                 narration_text = generate_narration(topic, memories_context, transcription)
                 print(f"💬 Narration: {narration_text}")
@@ -287,7 +318,7 @@ async def patient_query_test(
             return PatientQueryResponse(
                 topic=topic,
                 text=narration_text,
-                displayMode=display_mode,
+                displayMode=adjusted_mode,
                 media=media_urls
             )
 
@@ -320,21 +351,125 @@ async def list_patient_experiences(limit: int = 10):
     """
     **Patient Endpoint**: List all available experiences.
 
-    Returns all experiences auto-assigned to the patient (all created by therapist).
+    Returns all experiences from Snowflake (created by therapist).
     """
 
-    recent = list(experiences.values())[-limit:]
+    with SnowflakeClient() as client:
+        query = """
+        SELECT title, general_context, created_at, total_memories
+        FROM THERAPIST_EXPERIENCES
+        ORDER BY created_at DESC
+        LIMIT %s
+        """
 
-    return {
-        "status": "success",
-        "total": len(experiences),
-        "experiences": [
-            {
-                "experience_id": exp["experience_id"],
-                "title": exp["title"],
-                "created_at": exp["created_at"],
-                "total_memories": exp["total_memories"]
-            }
-            for exp in reversed(recent)
-        ]
+        client.cursor.execute(query, (limit,))
+        results = client.cursor.fetchall()
+
+        return {
+            "status": "success",
+            "total": len(results) if results else 0,
+            "experiences": [
+                {
+                    "title": row[0],
+                    "general_context": row[1],
+                    "created_at": str(row[2]),
+                    "total_memories": row[3]
+                }
+                for row in (results or [])
+            ]
+        }
+
+
+@router.get("/experience/topic/{topic}")
+async def get_experience_by_topic(topic: str):
+    """
+    **Patient Endpoint**: Get experience by topic with random non-agent display.
+
+    Patient clicks "I want to learn about college" → Fetches matching experience
+    → Returns with random display mode (4-pic, 3-pic, 5-pic, video, vertical-video)
+
+    **Example:**
+    ```
+    GET /patient/experience/topic/college
+    ```
+
+    **Response:**
+    ```json
+    {
+        "topic": "college",
+        "title": "College Days Memories",
+        "text": "College days were full of excitement...",
+        "displayMode": "4-pic",
+        "media": ["url1.jpg", "url2.jpg", "url3.jpg", "url4.jpg"]
     }
+    ```
+    """
+
+    with SnowflakeClient() as client:
+        # Search for experience matching topic (case-insensitive)
+        query = """
+        SELECT experience_data
+        FROM THERAPIST_EXPERIENCES
+        WHERE LOWER(title) LIKE LOWER(%s)
+           OR LOWER(general_context) LIKE LOWER(%s)
+        ORDER BY created_at DESC
+        LIMIT 1
+        """
+
+        search_pattern = f"%{topic}%"
+        client.cursor.execute(query, (search_pattern, search_pattern))
+        results = client.cursor.fetchall()
+
+        if not results or not results[0][0]:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No experience found for topic: {topic}"
+            )
+
+        # Parse experience data from JSON
+        experience_data = json.loads(results[0][0]) if isinstance(results[0][0], str) else results[0][0]
+
+        # Extract all media from all scenes
+        all_media = []
+        for scene in experience_data.get("scenes", []):
+            for memory in scene.get("memories", []):
+                all_media.append({
+                    "url": memory["file_url"],
+                    "type": memory["file_type"],
+                    "description": memory["description"]
+                })
+
+        # Count available images to determine appropriate display mode
+        images = [m["url"] for m in all_media if m["type"].lower() == "image"]
+        videos = [m["url"] for m in all_media if m["type"].lower() == "video"]
+
+        # Choose display mode based on available content
+        if len(images) >= 5:
+            display_mode = random.choice(["5-pic", "4-pic", "3-pic"])
+        elif len(images) == 4:
+            display_mode = "4-pic"
+        elif len(images) == 3:
+            display_mode = "3-pic"
+        elif len(images) == 2:
+            display_mode = "2-pic"
+        elif len(images) == 1:
+            display_mode = "1-pic"
+        elif videos:
+            display_mode = random.choice(["video", "vertical-video"])
+        else:
+            display_mode = "4-pic"  # Fallback
+
+        # Select media based on chosen mode
+        selected_media = []
+        if display_mode in ["1-pic", "2-pic", "3-pic", "4-pic", "5-pic"]:
+            count = int(display_mode.split("-")[0])
+            selected_media = images[:count]
+        elif display_mode in ["video", "vertical-video"]:
+            selected_media = videos[:1] if videos else images[:1]
+
+        return PatientQueryResponse(
+            topic=topic,
+            text=experience_data.get("overall_narrative"),
+            displayMode=display_mode,
+            media=selected_media
+        )
