@@ -80,7 +80,8 @@ def get_agent_profile(agent_name: str = "Avery") -> AgentProfile:
 async def generate_agent_speech(text: str, voice_name: str) -> str:
     """Call TTS API to generate speech and upload to GCS"""
 
-    tts_url = "https://forgetmenot-eq7i.onrender.com/text-to-speech"
+    # Use environment variable for TTS URL, default to deployed API
+    tts_url = os.getenv("TTS_API_URL", "https://forgetmenot-eq7i.onrender.com/text-to-speech")
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
@@ -111,11 +112,15 @@ async def generate_agent_speech(text: str, voice_name: str) -> str:
         # Upload binary audio content
         blob.upload_from_string(response.content, content_type="audio/mpeg")
 
-        # Make public and get URL
-        blob.make_public()
-        public_url = blob.public_url
+        # Generate signed URL (valid for 1 hour)
+        from datetime import timedelta
+        signed_url = blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(hours=1),
+            method="GET"
+        )
 
-        return public_url
+        return signed_url
 
 
 @router.post("/talk", response_model=AgentResponse)
