@@ -1,6 +1,7 @@
 """Snowflake database client for memory vault operations."""
 
 import snowflake.connector
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from .config import Config
 
 
@@ -62,6 +63,42 @@ class SnowflakeClient:
         except Exception as e:
             print(f"❌ Insert failed for {clip_data['clip_name']}: {e}")
             return False
+
+    def batch_insert_clips(self, clips_data, max_workers=4):
+        """
+        Insert multiple clips in parallel using thread pool.
+
+        Args:
+            clips_data: List of clip data dictionaries
+            max_workers: Maximum number of parallel threads (default: 4)
+
+        Returns:
+            Tuple of (success_count, failure_count)
+        """
+        success_count = 0
+        failure_count = 0
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all insert tasks
+            future_to_clip = {
+                executor.submit(self.insert_clip_with_embedding, clip): clip
+                for clip in clips_data
+            }
+
+            # Process completed tasks
+            for future in as_completed(future_to_clip):
+                clip = future_to_clip[future]
+                try:
+                    if future.result():
+                        print(f"✅ Inserted {clip['clip_name']} with embedding")
+                        success_count += 1
+                    else:
+                        failure_count += 1
+                except Exception as e:
+                    print(f"❌ Exception for {clip['clip_name']}: {e}")
+                    failure_count += 1
+
+        return success_count, failure_count
 
     def commit(self):
         """Commit pending transactions."""
