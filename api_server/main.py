@@ -5,6 +5,7 @@ Endpoints:
 2. POST /generate-context - Upload names.json, run name conversion + context generation
 3. POST /text-to-speech - Generate speech in a person's voice
 4. GET /voices - List all available voice clones
+5. POST /lipsync - Create lip-synced talking head video from image + audio
 """
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -471,6 +472,128 @@ async def list_voices():
         "voices": list(voice_mapping.keys()),
         "count": len(voice_mapping)
     }
+
+# ============================================================================
+# LIPSYNC VIDEO GENERATION ENDPOINT (GOOEY.AI)
+# ============================================================================
+
+@app.post("/lipsync")
+async def create_lipsync_video(
+    image: UploadFile = File(..., description="Still image (JPG/PNG)"),
+    audio: UploadFile = File(..., description="Audio file (MP3/WAV)")
+):
+    """
+    Generate a lip-synced talking head video using Gooey.AI
+    
+    Upload a still image and audio file to create a video where the person
+    in the image appears to be speaking the audio.
+    
+    Request:
+    - image: Image file (jpg, png, mp4, mov)
+    - audio: Audio file (mp3, wav)
+    
+    Returns: MP4 video URL
+    
+    Example:
+    ```bash
+    curl -X POST http://localhost:8000/lipsync \
+      -F "image=@photo.jpg" \
+      -F "audio=@speech.mp3"
+    ```
+    """
+    
+    gooey_api_key = os.getenv('GOOEY_API_KEY')
+    if not gooey_api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="GOOEY_API_KEY not configured. Get your API key from https://gooey.ai"
+        )
+    
+    # Validate file types
+    image_extensions = ['.jpg', '.jpeg', '.png', '.mp4', '.mov']
+    audio_extensions = ['.mp3', '.wav']
+    
+    image_ext = os.path.splitext(image.filename)[1].lower()
+    audio_ext = os.path.splitext(audio.filename)[1].lower()
+    
+    if image_ext not in image_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid image format. Supported: {', '.join(image_extensions)}"
+        )
+    
+    if audio_ext not in audio_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid audio format. Supported: {', '.join(audio_extensions)}"
+        )
+    
+    try:
+        # Read file contents
+        image_content = await image.read()
+        audio_content = await audio.read()
+        
+        # Prepare multipart form data for Gooey.AI
+        files = {
+            'input_face': (image.filename, image_content, image.content_type),
+            'input_audio': (audio.filename, audio_content, audio.content_type),
+        }
+        
+        data = {
+            'json': json.dumps({})  # Empty payload, using defaults
+        }
+        
+        # Call Gooey.AI Lipsync API
+        response = requests.post(
+            "https://api.gooey.ai/v2/Lipsync/form/",
+            headers={
+                "Authorization": f"Bearer {gooey_api_key}",
+            },
+            files=files,
+            data=data,
+            timeout=120  # 2 minute timeout for video generation
+        )
+        
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Gooey.AI API error: {response.text}"
+            )
+        
+        result = response.json()
+        
+        # Extract video URL from response
+        output_video_url = result.get('output', {}).get('output_video')
+        
+        if not output_video_url:
+            raise HTTPException(
+                status_code=500,
+                detail="No video URL in Gooey.AI response"
+            )
+        
+        return {
+            "status": "success",
+            "video_url": output_video_url,
+            "gooey_url": result.get('url'),
+            "run_id": result.get('id'),
+            "message": "Lip-sync video generated successfully!"
+        }
+        
+    except requests.exceptions.Timeout:
+        raise HTTPException(
+            status_code=504,
+            detail="Video generation timed out. Try with shorter audio or smaller image."
+        )
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Request to Gooey.AI failed: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error: {str(e)}"
+        )
 
 if __name__ == "__main__":
     import uvicorn
