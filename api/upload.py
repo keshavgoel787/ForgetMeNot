@@ -20,7 +20,7 @@ from scripts.lib.snowflake_client import SnowflakeClient
 from scripts.lib.config import Config
 from api.schemas import UploadMetadataRequest, UploadMetadataResponse, FileUploadResponse, ErrorResponse
 
-router = APIRouter(prefix="/upload", tags=["Upload"])
+router = APIRouter(prefix="/admin/upload", tags=["Admin"])
 
 
 @router.post("/snowflake", response_model=UploadMetadataResponse)

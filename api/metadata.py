@@ -11,7 +11,7 @@ sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'script
 from scripts.build_metadata_from_context import build_rows
 from api.schemas import BuildMetadataResponse, MetadataRow, ErrorResponse
 
-router = APIRouter(prefix="/metadata", tags=["Metadata"])
+router = APIRouter(prefix="/admin/metadata", tags=["Admin"])
 
 
 @router.post("/build", response_model=BuildMetadataResponse)

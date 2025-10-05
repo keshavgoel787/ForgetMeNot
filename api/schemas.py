@@ -144,6 +144,30 @@ class HealthCheckResponse(BaseModel):
 
 
 # ============================================================================
+# Patient Query Schemas (6-Mode Response System)
+# ============================================================================
+
+class PatientQueryRequest(BaseModel):
+    """Patient query request with audio and topic"""
+    usermp3: str = Field(..., description="Base64 encoded MP3 audio or file path")
+    topic: str = Field(..., description="Topic/person/event name (e.g., 'Avery', 'College', 'Beach Day')")
+
+
+class PatientQueryResponse(BaseModel):
+    """
+    Patient query response - supports 6 display modes:
+    - 4-pic, 3-pic, 5-pic: Multiple images with narration
+    - video: Horizontal video with narration
+    - vertical-video: Vertical video with narration
+    - agent: Conversational lip-sync video (no text)
+    """
+    topic: str
+    text: Optional[str] = Field(None, description="AI-generated narration (null for agent mode)")
+    displayMode: str = Field(..., description="One of: 4-pic, 3-pic, video, 5-pic, vertical-video, agent")
+    media: List[str] = Field(..., description="List of media URLs (images or videos)")
+
+
+# ============================================================================
 # Error Response Schemas
 # ============================================================================
 

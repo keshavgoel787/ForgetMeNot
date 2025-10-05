@@ -9,11 +9,10 @@ import os
 import time
 import logging
 
-from api.transcribe import router as transcribe_router
-from api.memories import router as memories_router
-from api.metadata import router as metadata_router
-from api.upload import router as upload_router
-from api.experiences import router as experiences_router
+from api.experiences import router as therapist_router
+from api.patient_query import router as patient_router
+from api.metadata import router as admin_metadata_router
+from api.upload import router as admin_upload_router
 
 # Load environment variables
 load_dotenv()
@@ -67,27 +66,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(transcribe_router, tags=["Transcription"])
-app.include_router(memories_router, tags=["Memories"])
-app.include_router(metadata_router, tags=["Metadata"])
-app.include_router(upload_router, tags=["Upload"])
-app.include_router(experiences_router, tags=["Experiences"])
+# Include routers - Organized by Therapist → Admin → Patient
+app.include_router(therapist_router)
+app.include_router(patient_router)
+app.include_router(admin_metadata_router)
+app.include_router(admin_upload_router)
 
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
+    """Health check and API overview"""
     return {
         "status": "running",
-        "service": "ReMind API",
+        "service": "ReMind - AI Companion for Alzheimer's Care",
         "version": "2.0.0",
+        "architecture": "Therapist → Admin → Patient",
         "endpoints": {
-            "memories": "/memories/search - Search and retrieve memories with AI",
-            "metadata": "/metadata/build - Build metadata from GCS",
-            "upload_snowflake": "/upload/snowflake - Upload metadata to Snowflake",
-            "upload_gcs": "/upload/gcs - Upload files to Google Cloud Storage",
-            "transcribe": "/transcribe/ - Transcribe audio files",
+            "therapist": {
+                "create_experience": "POST /therapist/create-experience - Create memory experience for patient",
+                "list_experiences": "GET /therapist/experiences - List all created experiences",
+                "delete_experience": "DELETE /therapist/experience/{id} - Delete an experience"
+            },
+            "patient": {
+                "query": "POST /patient/query - Ask questions (6-mode AI response)",
+                "query_test": "POST /patient/query-test - Test query without audio",
+                "view_experience": "GET /patient/experience/{id} - View assigned experience",
+                "list_experiences": "GET /patient/experiences - List available experiences"
+            },
+            "admin": {
+                "build_metadata": "POST /admin/metadata/build - Build metadata from GCS",
+                "upload_snowflake": "POST /admin/upload/snowflake - Upload to Snowflake",
+                "upload_gcs": "POST /admin/upload/gcs - Upload files to GCS"
+            },
             "docs": "/docs - Interactive API documentation"
-        }
+        },
+        "flow": "Therapist creates experience → Patient views & interacts → Admin manages data"
     }

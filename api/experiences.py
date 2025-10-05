@@ -20,7 +20,7 @@ from api.schemas import MemoryResult
 # In-memory storage for experiences (use Redis/DB in production)
 experiences = {}
 
-router = APIRouter(prefix="/experiences", tags=["Memory Experiences"])
+router = APIRouter(prefix="/therapist", tags=["Therapist"])
 
 
 class CreateExperienceRequest(BaseModel):
@@ -50,13 +50,14 @@ class ExperienceResponse(BaseModel):
     patient_url: str
 
 
-@router.post("/create", response_model=ExperienceResponse)
+@router.post("/create-experience", response_model=ExperienceResponse)
 async def create_experience(request: CreateExperienceRequest):
     """
-    **Therapist Endpoint**: Create a memory experience.
+    **Therapist Endpoint**: Create a memory experience for the patient.
 
     The therapist submits an experience request with title, context, and scenes.
     The system searches for memories, generates AI narratives, and returns everything.
+    Experience is automatically available to the patient.
 
     **Example Request:**
     ```json
@@ -161,34 +162,14 @@ async def create_experience(request: CreateExperienceRequest):
             overall_narrative=overall_narrative,
             total_memories=total_memories,
             created_at=timestamp,
-            patient_url=f"/experiences/view/{experience_id}"
+            patient_url=f"/patient/experience/{experience_id}"
         )
 
 
-@router.get("/view/{experience_id}")
-async def view_experience(experience_id: str):
-    """
-    **Patient Endpoint**: View an experience by ID.
-
-    The patient accesses this URL to see their memory experience.
-    """
-
-    if experience_id not in experiences:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Experience {experience_id} not found"
-        )
-
-    return {
-        "status": "success",
-        "experience": experiences[experience_id]
-    }
-
-
-@router.get("/list")
+@router.get("/experiences", summary="List all experiences created by therapist")
 async def list_experiences(limit: int = 10):
     """
-    List recent experiences.
+    **Therapist Endpoint**: List all experiences created.
 
     **Query Params:**
     - `limit`: Maximum number of experiences to return (default: 10)
@@ -205,16 +186,18 @@ async def list_experiences(limit: int = 10):
                 "title": exp["title"],
                 "created_at": exp["created_at"],
                 "total_memories": exp["total_memories"],
-                "patient_url": f"/experiences/view/{exp['experience_id']}"
+                "patient_url": f"/patient/experience/{exp['experience_id']}"
             }
             for exp in reversed(recent)
         ]
     }
 
 
-@router.delete("/{experience_id}")
+@router.delete("/experience/{experience_id}")
 async def delete_experience(experience_id: str):
-    """Delete an experience"""
+    """
+    **Therapist Endpoint**: Delete an experience
+    """
 
     if experience_id not in experiences:
         raise HTTPException(
