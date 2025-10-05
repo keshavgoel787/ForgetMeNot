@@ -22,12 +22,12 @@ const USE_MOCK_DATA = true;  // Set to false to enable real API calls
 ### 1. Extract Faces Mock Data
 
 When you upload a ZIP file, the app generates:
-- **3 person folders** (`person_1`, `person_2`, `person_3`)
-- **16 face images per person** (colored squares with numbers)
-- Each person has a unique color:
-  - Person 1: Red (#FF6B6B)
-  - Person 2: Teal (#4ECDC4)
-  - Person 3: Blue (#45B7D1)
+- **3 face set folders** (`face_set_1`, `face_set_2`, `face_set_3`)
+- **16 face images per face set** (colored squares with numbers)
+- Each face set has a unique color:
+  - Face Set 1: Red (#FF6B6B)
+  - Face Set 2: Teal (#4ECDC4)
+  - Face Set 3: Blue (#45B7D1)
 
 ### 2. Generate Context Mock Data
 
@@ -35,11 +35,11 @@ After naming people, the app generates:
 - **3 mock memories** (`memory_001`, `memory_002`, `memory_003`)
 - **context.json** for each memory with:
   - Memory ID
-  - People identified (from your names)
-  - Random people count and image count
+  - Faces identified (from your names)
+  - Random face count and image count
   - AI-generated description
   - Timestamp
-- **Named people folders** with 5 face images each
+- **Named face folders** with 5 face images each
 - **Placeholder images** for each memory
 
 ## How It Works
@@ -75,8 +75,8 @@ All mock data is generated client-side using:
 1. Go to `/face-naming` page
 2. Upload ANY ZIP file (content doesn't matter in mock mode)
 3. Click "Extract Faces"
-4. See 3 person folders with colored face bubbles
-5. Name each person
+4. See 3 face set folders with colored face bubbles
+5. Name each face set
 6. Click "Save Everything"
 7. Download the annotated ZIP with your names
 
@@ -84,16 +84,16 @@ All mock data is generated client-side using:
 
 ### After Extract Faces
 ```
-people/
-  person_1/
+face/
+  face_set_1/
     face_001.jpg  (red square with "1")
     face_002.jpg  (red square with "2")
     ...
     face_016.jpg  (red square with "16")
-  person_2/
+  face_set_2/
     face_001.jpg  (teal square with "1")
     ...
-  person_3/
+  face_set_3/
     face_001.jpg  (blue square with "1")
     ...
 ```
@@ -110,7 +110,7 @@ memories/
   memory_003/
     context.json
     photo.jpg
-people/
+face/
   [YourName1]/
     face_001.jpg
     face_002.jpg
@@ -125,8 +125,8 @@ people/
 ```json
 {
   "memory_id": "memory_001",
-  "people_identified": ["John", "Jane"],
-  "people_count": 2,
+  "faces_identified": ["John", "Jane"],
+  "face_count": 2,
   "image_count": 8,
   "description": "A memory featuring John, Jane.",
   "generated_at": "2025-10-05T03:32:55.000Z"
@@ -181,8 +181,8 @@ The app handles errors gracefully:
 
 ⚠️ **No real face detection** - Uses placeholder images  
 ⚠️ **No AI context** - Generates simple descriptions  
-⚠️ **Fixed person count** - Always creates 3 people  
-⚠️ **Random assignments** - People in memories are random  
+⚠️ **Fixed face set count** - Always creates 3 face sets  
+⚠️ **Random assignments** - Faces in memories are random  
 
 ## Troubleshooting
 
@@ -217,7 +217,7 @@ The app handles errors gracefully:
 
 ## Future Enhancements
 
-- [ ] Add more mock person variations
+- [ ] Add more mock face set variations
 - [ ] Generate more realistic face images
 - [ ] Configurable mock data settings
 - [ ] Mock data presets (small/medium/large datasets)

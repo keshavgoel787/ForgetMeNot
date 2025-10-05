@@ -7,7 +7,7 @@ This document explains how the Face Naming page integrates with the ForgetMeNot 
 The face naming workflow now uses two main API endpoints from the Python FastAPI server:
 
 1. **POST /extract-faces** - Extracts and clusters faces from uploaded memories
-2. **POST /generate-context** - Generates AI context with named people
+2. **POST /generate-context** - Generates AI context with named faces
 
 ## Architecture
 
@@ -25,16 +25,16 @@ User Upload → Extract Faces API → Face Naming UI → Generate Context API �
 ### 2. Face Extraction Phase
 - ZIP file is sent to `POST /extract-faces`
 - Backend extracts faces using face_recognition library
-- Faces are clustered into `person_1`, `person_2`, etc.
-- Returns a ZIP with 16 sampled faces per person
+- Faces are clustered into `face_set_1`, `face_set_2`, etc.
+- Returns a ZIP with 16 sampled faces per face set
 - Client parses the ZIP and displays face bubbles
 - State: `processingStage = 'extracting'` → `'naming'`
 
 ### 3. Naming Phase
-- User assigns names to each person cluster
+- User assigns names to each face cluster
 - Interactive bubble UI with mouse repulsion physics
 - Names are stored in `allAssignments` state object
-- Format: `{ "person_1": "John", "person_2": "Jane" }`
+- Format: `{ "face_set_1": "John", "face_set_2": "Jane" }`
 - State: `processingStage = 'naming'`
 
 ### 4. Context Generation Phase
@@ -42,7 +42,7 @@ User Upload → Extract Faces API → Face Naming UI → Generate Context API �
 - Original ZIP + names mapping sent to `POST /generate-context`
 - Backend:
   - Re-extracts ALL faces (not sampled)
-  - Applies name mappings to person folders
+  - Applies name mappings to face folders
   - Generates AI context for each memory using Gemini
   - Creates `context.json` in each memory folder
 - Returns complete annotated ZIP
@@ -63,18 +63,18 @@ FormData {
 
 **Response:** ZIP blob containing:
 ```
-people/
-  person_1/
+face/
+  face_set_1/
     face_001.jpg
     face_002.jpg
     ...
-  person_2/
+  face_set_2/
     face_001.jpg
     ...
 ```
 
 ### `generateContext(dataZipFile: File, namesMapping: Record<string, string>): Promise<Blob>`
-Generates context with named people.
+Generates context with named faces.
 
 **Request:**
 ```typescript
@@ -87,8 +87,8 @@ FormData {
 **Names JSON Format:**
 ```json
 {
-  "John": "person_1,person_3",
-  "Jane": "person_2"
+  "John": "face_set_1,face_set_3",
+  "Jane": "face_set_2"
 }
 ```
 
@@ -101,7 +101,7 @@ memories/
     context.json
   memory_002/
     ...
-people/
+face/
   John/
     face_001.jpg
     ...
@@ -132,7 +132,7 @@ type ProcessingStage =
 ### Key State Variables
 - `uploadedFile: File | null` - Original uploaded ZIP (kept for generate-context)
 - `extractedZipBlob: Blob | null` - Result from extract-faces API
-- `folders: Folder[]` - Parsed person folders with image URLs
+- `folders: Folder[]` - Parsed face folders with image URLs
 - `allAssignments: { [folderName: string]: string }` - Name assignments
 - `processingProgress: string` - Current progress message
 - `errorMessage: string` - Error details if any
@@ -172,7 +172,7 @@ All API calls are wrapped in try-catch blocks:
 - Interactive bubble physics
 - Mouse repulsion effect
 - Name input with Enter key support
-- Navigation between people
+- Navigation between face sets
 - Progress indicator
 
 ### Summary Screen

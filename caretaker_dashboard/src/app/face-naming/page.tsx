@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { extractFaces, generateContext, parseExtractedFacesZip, downloadBlob } from '@/lib/api-client';
+import { extractFaces, saveNamedFaces, parseExtractedFacesZip } from '@/lib/api-client';
 import { Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface Folder {
@@ -49,6 +49,9 @@ export default function FaceNamingPage() {
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   
+  // Enlarged bubble modal state
+  const [enlargedBubble, setEnlargedBubble] = useState<Bubble | null>(null);
+  
   // API Integration State
   const [processingStage, setProcessingStage] = useState<ProcessingStage>('upload');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -69,19 +72,19 @@ export default function FaceNamingPage() {
   };
 
   // Step 1: Extract faces from uploaded ZIP
-  const handleExtractFaces = async () => {
-    if (!uploadedFile) {
+  const handleExtractFaces = async (useMock: boolean = false) => {
+    if (!uploadedFile && !useMock) {
       setErrorMessage('Please upload a ZIP file first');
       return;
     }
 
     setProcessingStage('extracting');
-    setProcessingProgress('Uploading and extracting faces... (using mock data)');
+    setProcessingProgress(useMock ? '🎭 Demo Mode: Extracting faces from mock data...' : 'Extracting faces from your uploaded file...');
     setErrorMessage('');
 
     try {
-      // Call extract-faces API (will use mock data if API unavailable)
-      const zipBlob = await extractFaces(uploadedFile);
+      // Call extract-faces API (will use mock data if useMock is true)
+      const zipBlob = await extractFaces(uploadedFile!, useMock);
       setExtractedZipBlob(zipBlob);
       
       setProcessingProgress('Parsing extracted faces...');
@@ -114,6 +117,8 @@ export default function FaceNamingPage() {
   useEffect(() => {
     if (folders.length > 0 && currentFolderIndex < folders.length && processingStage === 'naming') {
       const currentFolder = folders[currentFolderIndex];
+      // Add cache-busting to force browser to reload new images
+      const cacheBuster = Date.now();
       const newBubbles: Bubble[] = currentFolder.imageUrls.map((imageUrl, index) => {
         const angle = (index / currentFolder.imageUrls.length) * Math.PI * 2;
         const radius = 200;
@@ -122,6 +127,11 @@ export default function FaceNamingPage() {
         const x = centerX + Math.cos(angle) * radius;
         const y = centerY + Math.sin(angle) * radius;
         
+        // Add cache buster to image URL
+        const imageWithCacheBuster = imageUrl.includes('?') 
+          ? `${imageUrl}&v=${cacheBuster}` 
+          : `${imageUrl}?v=${cacheBuster}`;
+        
         return {
           id: `${currentFolder.name}-${index}`,
           x,
@@ -129,7 +139,7 @@ export default function FaceNamingPage() {
           vx: (Math.random() - 0.5) * 2,
           vy: (Math.random() - 0.5) * 2,
           size: 80 + Math.random() * 40,
-          image: imageUrl,
+          image: imageWithCacheBuster,
           name: '',
           originalX: x,
           originalY: y,
@@ -155,7 +165,7 @@ export default function FaceNamingPage() {
   useEffect(() => {
     if (bubbles.length === 0 || processingStage !== 'naming') return;
     
-    const repelRadius = 150;
+    const repelRadius = 100; // Reduced from 150
     const repelRadiusSq = repelRadius * repelRadius; // Avoid sqrt when possible
     
     const animate = () => {
@@ -174,8 +184,8 @@ export default function FaceNamingPage() {
           if (distanceSq < repelRadiusSq && distanceSq > 0) {
             const distance = Math.sqrt(distanceSq);
             const force = (repelRadius - distance) / repelRadius;
-            const pushX = (dx / distance) * force * 80;
-            const pushY = (dy / distance) * force * 80;
+            const pushX = (dx / distance) * force * 40; // Reduced from 80
+            const pushY = (dy / distance) * force * 40; // Reduced from 80
             targetX = bubble.originalX + pushX;
             targetY = bubble.originalY + pushY;
           }
@@ -234,36 +244,26 @@ export default function FaceNamingPage() {
     }
   };
 
-  const handleSaveFinal = async () => {
-    if (!uploadedFile) {
-      setErrorMessage('Original data file is missing');
-      return;
-    }
-
+  const handleSaveFinal = async (useMock: boolean = false) => {
     setProcessingStage('generating');
-    setProcessingProgress('Generating context with AI... (using mock data)');
+    setProcessingProgress('Saving named faces to backend...');
     setShowSummary(false);
     setErrorMessage('');
 
     try {
-      // Call generate-context API with names mapping (will use mock data if API unavailable)
-      const contextZipBlob = await generateContext(uploadedFile, allAssignments);
-      
-      setProcessingProgress('Complete! Downloading results...');
-      
-      // Download the complete annotated ZIP
-      downloadBlob(contextZipBlob, 'annotated_memories.zip');
+      // Save named faces to backend API
+      await saveNamedFaces(allAssignments, useMock);
       
       setProcessingStage('complete');
       setProcessingProgress('');
       
       // Show success message
       setTimeout(() => {
-        alert('✅ Processing complete! Your annotated memories have been downloaded.\n\n(Demo mode: Mock data was used)');
+        alert(useMock ? '✅ Named faces saved successfully!\n\n🎭 Demo Mode: Names saved locally (not sent to server)' : '✅ Named faces saved successfully to the server!');
       }, 500);
     } catch (error: any) {
-      console.error('Error generating context:', error);
-      setErrorMessage(error.message || 'Failed to generate context. Please try again.');
+      console.error('Error saving named faces:', error);
+      setErrorMessage(error.message || 'Failed to save named faces. Please try again.');
       setProcessingStage('error');
       setShowSummary(true); // Go back to summary
     }
@@ -323,13 +323,22 @@ export default function FaceNamingPage() {
               />
             </div>
 
-            <Button
-              onClick={handleExtractFaces}
-              disabled={!uploadedFile}
-              className="w-full h-16 text-xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Extract Faces
-            </Button>
+            <div className="flex gap-4">
+              <Button
+                onClick={() => handleExtractFaces(false)}
+                disabled={!uploadedFile}
+                className="flex-1 h-16 text-xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Process Files
+              </Button>
+              <Button
+                onClick={() => handleExtractFaces(true)}
+                variant="outline"
+                className="h-16 px-8 text-xl font-bold bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white border-0"
+              >
+                🎭 Mock Demo
+              </Button>
+            </div>
           </div>
 
           <div className="mt-8 p-4 bg-white/5 rounded-lg border border-white/10">
@@ -338,16 +347,15 @@ export default function FaceNamingPage() {
               1. Upload your memories ZIP file<br />
               2. AI extracts and clusters faces<br />
               3. Name each person<br />
-              4. Generate context with AI<br />
-              5. Download annotated memories
+              4. Save names to backend
             </p>
           </div>
 
           <div className="mt-4 p-4 bg-blue-500/20 border border-blue-500/50 rounded-lg">
             <p className="text-blue-200 text-sm">
-              <strong className="text-blue-100">ℹ️ Demo Mode:</strong><br />
-              API is currently disabled. The app will use mock data for demonstration purposes.
-              To enable real API calls, set <code className="bg-black/30 px-1 rounded">USE_MOCK_DATA = false</code> in <code className="bg-black/30 px-1 rounded">api-client.ts</code>
+              <strong className="text-blue-100">💡 Two Options:</strong><br />
+              • <strong>Process Files:</strong> Upload a real ZIP file to extract faces using the API<br />
+              • <strong>Mock Demo:</strong> Skip upload and use hardcoded demo data to test the interface
             </p>
           </div>
         </div>
@@ -362,13 +370,13 @@ export default function FaceNamingPage() {
         <div className="max-w-2xl w-full bg-white/10 backdrop-blur-lg rounded-3xl p-12 border border-white/20 shadow-2xl text-center">
           <Loader2 className="w-20 h-20 mx-auto mb-6 text-purple-300 animate-spin" />
           <h2 className="text-4xl font-bold text-white mb-4">
-            {processingStage === 'extracting' ? 'Extracting Faces...' : 'Generating Context...'}
+            {processingStage === 'extracting' ? 'Extracting Faces...' : 'Saving Names...'}
           </h2>
           <p className="text-white/70 text-lg mb-8">{processingProgress}</p>
           <div className="w-full bg-white/10 rounded-full h-3 overflow-hidden">
             <div className="h-full bg-gradient-to-r from-purple-500 to-pink-500 animate-pulse" style={{ width: '100%' }}></div>
           </div>
-          <p className="text-white/50 text-sm mt-6">This may take a few minutes...</p>
+          <p className="text-white/50 text-sm mt-6">This may take a moment...</p>
         </div>
       </div>
     );
@@ -384,7 +392,7 @@ export default function FaceNamingPage() {
             All Done! 🎉
           </h2>
           <p className="text-white/80 text-lg mb-8">
-            Your annotated memories have been downloaded successfully.
+            Your named faces have been saved successfully.
           </p>
           <Button
             onClick={() => {
@@ -585,7 +593,7 @@ export default function FaceNamingPage() {
                 ← Edit Names
               </Button>
               <Button
-                onClick={handleSaveFinal}
+                onClick={() => handleSaveFinal(false)}
                 className="h-14 px-10 text-lg font-bold bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 hover:from-green-600 hover:via-emerald-600 hover:to-teal-600 text-white shadow-xl hover:shadow-2xl hover:scale-105 transition-all active:scale-95"
               >
                 <span className="mr-2">💾</span> Save Everything
@@ -613,6 +621,7 @@ export default function FaceNamingPage() {
               height: bubble.size,
               transform: 'translateZ(0)' // Force GPU acceleration
             }}
+            onClick={() => setEnlargedBubble(bubble)}
           >
             <div className="relative w-full h-full group cursor-pointer">
               {/* Glow effect */}
@@ -705,8 +714,58 @@ export default function FaceNamingPage() {
       {/* Instructions */}
       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0">
         <p className="text-white/30 text-xl font-bold text-center">
+          Move your mouse to interact with the bubbles • Click to enlarge
         </p>
       </div>
+
+      {/* Enlarged Bubble Modal */}
+      {enlargedBubble && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
+          onClick={() => setEnlargedBubble(null)}
+        >
+          <div 
+            className="relative animate-in zoom-in-95 duration-500 ease-out"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Animated glow effect */}
+            <div className="absolute -inset-8 rounded-full bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600 opacity-60 blur-3xl animate-pulse"></div>
+            
+            {/* Main enlarged bubble */}
+            <div className="relative w-[400px] h-[400px] animate-in spin-in-180 duration-700 ease-out">
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 opacity-50 blur-2xl animate-pulse"></div>
+              <div className="absolute inset-4 rounded-full overflow-hidden border-4 border-white/60 shadow-2xl bg-white/10 backdrop-blur-sm">
+                <img
+                  src={enlargedBubble.image}
+                  alt="Enlarged face"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              {/* Shine effect */}
+              <div className="absolute inset-4 rounded-full bg-gradient-to-br from-white/40 via-transparent to-transparent pointer-events-none"></div>
+              {/* Sparkle effects */}
+              <div className="absolute top-8 right-8 w-3 h-3 bg-white rounded-full animate-ping"></div>
+              <div className="absolute bottom-12 left-12 w-2 h-2 bg-white rounded-full animate-pulse delay-150"></div>
+              <div className="absolute top-16 left-16 w-2.5 h-2.5 bg-white rounded-full animate-ping delay-300"></div>
+            </div>
+            
+            {/* Close button */}
+            <button
+              onClick={() => setEnlargedBubble(null)}
+              className="absolute -top-4 -right-4 w-12 h-12 rounded-full bg-white/90 hover:bg-white shadow-lg hover:shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 animate-in zoom-in duration-500 delay-200"
+            >
+              <svg className="w-6 h-6 text-gray-800" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                <path d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+            
+            {/* Click to close hint */}
+            <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 text-white/60 text-sm font-medium animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500">
+              Click anywhere to close
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes blob {

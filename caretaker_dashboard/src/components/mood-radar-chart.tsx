@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { TrendingUp } from "lucide-react"
 import { PolarAngleAxis, PolarGrid, Radar, RadarChart } from "recharts"
 
@@ -17,7 +18,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart"
 
-const chartData = [
+const fullChartData = [
   { emotion: "Happy", value: 85 },
   { emotion: "Calm", value: 70 },
   { emotion: "Engaged", value: 90 },
@@ -34,6 +35,37 @@ const chartConfig = {
 }
 
 export function MoodRadarChart() {
+  const [animatedData, setAnimatedData] = useState(
+    fullChartData.map(item => ({ ...item, value: 0 }))
+  )
+  const [currentIndex, setCurrentIndex] = useState(-1)
+
+  useEffect(() => {
+    // Initial delay before starting animation
+    const initialTimer = setTimeout(() => {
+      setCurrentIndex(0)
+    }, 400)
+
+    return () => clearTimeout(initialTimer)
+  }, [])
+
+  useEffect(() => {
+    if (currentIndex >= 0 && currentIndex < fullChartData.length) {
+      const timer = setTimeout(() => {
+        setAnimatedData(prev => 
+          prev.map((item, idx) => 
+            idx === currentIndex 
+              ? { ...item, value: fullChartData[idx].value }
+              : item
+          )
+        )
+        setCurrentIndex(prev => prev + 1)
+      }, 100) // 100ms delay between each point
+
+      return () => clearTimeout(timer)
+    }
+  }, [currentIndex])
+
   return (
     <Card>
       <CardHeader>
@@ -47,7 +79,7 @@ export function MoodRadarChart() {
           config={chartConfig}
           className="mx-auto aspect-square max-h-[300px]"
         >
-          <RadarChart data={chartData}>
+          <RadarChart data={animatedData}>
             <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
             <PolarAngleAxis dataKey="emotion" />
             <PolarGrid />
@@ -59,6 +91,8 @@ export function MoodRadarChart() {
                 r: 4,
                 fillOpacity: 1,
               }}
+              animationDuration={350}
+              animationEasing="ease-in-out"
             />
           </RadarChart>
         </ChartContainer>

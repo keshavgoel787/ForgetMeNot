@@ -127,33 +127,33 @@ def generate_context_with_names(zip_path, names_mapping, output_dir):
             clusters[label] = []
         clusters[label].append(all_faces[idx])
     
-    print(f"Created {len(clusters)} person clusters", file=sys.stderr)
+    print(f"Created {len(clusters)} face clusters", file=sys.stderr)
     
-    # Create person folders with ALL faces (not sampled)
-    person_id_to_name = {}
-    person_dirs = {}
+    # Create face folders with ALL faces (not sampled)
+    face_set_id_to_name = {}
+    face_set_dirs = {}
     
-    for person_idx, (cluster_id, faces) in enumerate(clusters.items(), 1):
-        person_id = f'person_{person_idx}'
-        person_dir = os.path.join(output_dir, person_id)
-        os.makedirs(person_dir, exist_ok=True)
-        person_dirs[person_id] = person_dir
+    for face_set_idx, (cluster_id, faces) in enumerate(clusters.items(), 1):
+        face_set_id = f'face_set_{face_set_idx}'
+        face_set_dir = os.path.join(output_dir, face_set_id)
+        os.makedirs(face_set_dir, exist_ok=True)
+        face_set_dirs[face_set_id] = face_set_dir
         
         # Save ALL faces (not sampled)
         for face_idx, face_data in enumerate(faces, 1):
-            face_path = os.path.join(person_dir, f'{face_idx}.jpg')
+            face_path = os.path.join(face_set_dir, f'{face_idx}.jpg')
             cv2.imwrite(face_path, cv2.cvtColor(face_data['image'], cv2.COLOR_RGB2BGR))
         
-        # Check if this person has a name in the mapping
-        person_name = None
-        for name, person_ids_str in names_mapping.items():
-            person_ids = [pid.strip() for pid in person_ids_str.split(',')]
-            if person_id in person_ids:
-                person_name = name
+        # Check if this face set has a name in the mapping
+        face_name = None
+        for name, face_set_ids_str in names_mapping.items():
+            face_set_ids = [pid.strip() for pid in face_set_ids_str.split(',')]
+            if face_set_id in face_set_ids:
+                face_name = name
                 break
         
-        person_id_to_name[person_id] = person_name or person_id
-        print(f"Created {person_id} with {len(faces)} faces, name: {person_id_to_name[person_id]}", file=sys.stderr)
+        face_set_id_to_name[face_set_id] = face_name or face_set_id
+        print(f"Created {face_set_id} with {len(faces)} faces, name: {face_set_id_to_name[face_set_id]}", file=sys.stderr)
     
     # Generate context.json for each memory folder
     print("Generating context for each memory...", file=sys.stderr)
@@ -165,17 +165,17 @@ def generate_context_with_names(zip_path, names_mapping, output_dir):
         memory_faces = []
         for face in all_faces:
             if face_to_memory.get(face['id']) == memory_folder:
-                # Find which cluster/person this face belongs to
+                # Find which cluster/face set this face belongs to
                 face_idx = face['id']
                 cluster_label = clustering.labels_[face_idx]
                 
-                # Find person_id for this cluster
-                for person_idx, (cluster_id, cluster_faces) in enumerate(clusters.items(), 1):
+                # Find face_set_id for this cluster
+                for face_set_idx, (cluster_id, cluster_faces) in enumerate(clusters.items(), 1):
                     if cluster_id == cluster_label:
-                        person_id = f'person_{person_idx}'
-                        person_name = person_id_to_name[person_id]
-                        if person_name not in memory_faces:
-                            memory_faces.append(person_name)
+                        face_set_id = f'face_set_{face_set_idx}'
+                        face_name = face_set_id_to_name[face_set_id]
+                        if face_name not in memory_faces:
+                            memory_faces.append(face_name)
                         break
         
         # Get all images in this memory
@@ -187,18 +187,18 @@ def generate_context_with_names(zip_path, names_mapping, output_dir):
                     image_files.append(file)
         
         # Generate AI context description
-        people_str = ", ".join(memory_faces) if memory_faces else "unknown people"
-        context_description = f"A memory featuring {people_str}. "
+        faces_str = ", ".join(memory_faces) if memory_faces else "unknown faces"
+        context_description = f"A memory featuring {faces_str}. "
         context_description += f"This collection contains {len(image_files)} photo(s). "
         
         if memory_faces:
-            context_description += f"People identified: {', '.join(memory_faces)}."
+            context_description += f"Faces identified: {', '.join(memory_faces)}."
         
         # Create context.json
         context_data = {
             "memory_id": memory_name,
-            "people_identified": memory_faces,
-            "people_count": len(memory_faces),
+            "faces_identified": memory_faces,
+            "face_count": len(memory_faces),
             "image_count": len(image_files),
             "description": context_description,
             "generated_at": datetime.now().isoformat(),
@@ -210,11 +210,11 @@ def generate_context_with_names(zip_path, names_mapping, output_dir):
         with open(context_path, 'w') as f:
             json.dump(context_data, f, indent=2)
         
-        print(f"Generated context for {memory_name}: {len(memory_faces)} people", file=sys.stderr)
+        print(f"Generated context for {memory_name}: {len(memory_faces)} faces", file=sys.stderr)
     
     return {
         'success': True,
-        'person_count': len(clusters),
+        'face_set_count': len(clusters),
         'memory_count': len(memory_folders),
         'total_faces': len(all_faces)
     }
@@ -336,15 +336,15 @@ if __name__ == '__main__':
     // Create output ZIP with complete annotated data
     const outputZip = new AdmZip();
     
-    // Add all person folders (with full faces, not sampled)
+    // Add all face folders (with full faces, not sampled)
     const entries = await fs.readdir(tempDir, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.isDirectory() && entry.name.startsWith('person_')) {
-        const personDir = path.join(tempDir, entry.name);
-        const faceFiles = await fs.readdir(personDir);
+      if (entry.isDirectory() && entry.name.startsWith('face_set_')) {
+        const faceSetDir = path.join(tempDir, entry.name);
+        const faceFiles = await fs.readdir(faceSetDir);
         
         for (const faceFile of faceFiles) {
-          const facePath = path.join(personDir, faceFile);
+          const facePath = path.join(faceSetDir, faceFile);
           const faceBuffer = await fs.readFile(facePath);
           outputZip.addFile(`${entry.name}/${faceFile}`, faceBuffer);
         }

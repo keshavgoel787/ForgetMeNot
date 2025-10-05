@@ -21,10 +21,10 @@ interface TestQuestion {
   event: string;
   image: string;
   correctLocation: string;
-  correctPeople: string[];
+  correctFaces: string[];
   options: {
     locations: string[];
-    people: string[];
+    faces: string[];
   };
 }
 
@@ -33,7 +33,7 @@ export default function MemoryTestPage() {
   const [testStarted, setTestStarted] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedLocation, setSelectedLocation] = useState("");
-  const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
+  const [selectedFaces, setSelectedFaces] = useState<string[]>([]);
   const [results, setResults] = useState<{ correct: boolean; question: number }[]>([]);
 
   const mockResidents = [
@@ -49,10 +49,10 @@ export default function MemoryTestPage() {
       event: "Birthday Party",
       image: "/placeholder-event.jpg",
       correctLocation: "Community Room",
-      correctPeople: ["Sarah", "John", "Emily"],
+      correctFaces: ["Sarah", "John", "Emily"],
       options: {
         locations: ["Community Room", "Garden", "Dining Hall", "Library"],
-        people: ["Sarah", "John", "Emily", "Michael", "Lisa", "David"],
+        faces: ["Sarah", "John", "Emily", "Michael", "Lisa", "David"],
       },
     },
     {
@@ -60,10 +60,10 @@ export default function MemoryTestPage() {
       event: "Garden Walk",
       image: "/placeholder-event.jpg",
       correctLocation: "Garden",
-      correctPeople: ["Nurse Mary", "Dr. Smith"],
+      correctFaces: ["Nurse Mary", "Dr. Smith"],
       options: {
         locations: ["Garden", "Park", "Courtyard", "Greenhouse"],
-        people: ["Nurse Mary", "Dr. Smith", "Therapist Jane", "Volunteer Tom"],
+        faces: ["Nurse Mary", "Dr. Smith", "Therapist Jane", "Volunteer Tom"],
       },
     },
   ];
@@ -71,25 +71,25 @@ export default function MemoryTestPage() {
   const handleSubmitAnswer = () => {
     const question = mockQuestions[currentQuestion];
     const locationCorrect = selectedLocation === question.correctLocation;
-    const peopleCorrect =
-      selectedPeople.length === question.correctPeople.length &&
-      selectedPeople.every((p) => question.correctPeople.includes(p));
+    const facesCorrect =
+      selectedFaces.length === question.correctFaces.length &&
+      selectedFaces.every((p) => question.correctFaces.includes(p));
 
-    const isCorrect = locationCorrect && peopleCorrect;
+    const isCorrect = locationCorrect && facesCorrect;
     setResults([...results, { correct: isCorrect, question: currentQuestion }]);
 
     if (currentQuestion < mockQuestions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
       setSelectedLocation("");
-      setSelectedPeople([]);
+      setSelectedFaces([]);
     }
   };
 
-  const togglePerson = (person: string) => {
-    if (selectedPeople.includes(person)) {
-      setSelectedPeople(selectedPeople.filter((p) => p !== person));
+  const toggleFace = (face: string) => {
+    if (selectedFaces.includes(face)) {
+      setSelectedFaces(selectedFaces.filter((p) => p !== face));
     } else {
-      setSelectedPeople([...selectedPeople, person]);
+      setSelectedFaces([...selectedFaces, face]);
     }
   };
 
@@ -97,7 +97,7 @@ export default function MemoryTestPage() {
     setTestStarted(false);
     setCurrentQuestion(0);
     setSelectedLocation("");
-    setSelectedPeople([]);
+    setSelectedFaces([]);
     setResults([]);
   };
 
@@ -123,7 +123,7 @@ export default function MemoryTestPage() {
               Memory Assessment Test
             </h1>
             <p className="text-muted-foreground">
-              Test resident memory recall for events, locations, and people
+              Test resident memory recall for events, locations, and faces
             </p>
           </div>
         </div>
@@ -163,7 +163,7 @@ export default function MemoryTestPage() {
                     </li>
                     <li className="flex items-start gap-2">
                       <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-500" />
-                      <span>They must recall the location and people present</span>
+                      <span>They must recall the location and faces present</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-500" />
@@ -294,7 +294,7 @@ export default function MemoryTestPage() {
                   </div>
                 </div>
 
-                {/* People Selection */}
+                {/* Face Selection */}
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <Users className="h-5 w-5 text-blue-500" />
@@ -303,14 +303,14 @@ export default function MemoryTestPage() {
                     </label>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    {mockQuestions[currentQuestion].options.people.map((person) => (
+                    {mockQuestions[currentQuestion].options.faces.map((face) => (
                       <Button
-                        key={person}
-                        variant={selectedPeople.includes(person) ? "default" : "outline"}
+                        key={face}
+                        variant={selectedFaces.includes(face) ? "default" : "outline"}
                         className="justify-start"
-                        onClick={() => togglePerson(person)}
+                        onClick={() => toggleFace(face)}
                       >
-                        {person}
+                        {face}
                       </Button>
                     ))}
                   </div>
@@ -318,7 +318,7 @@ export default function MemoryTestPage() {
 
                 <Button
                   className="w-full h-11"
-                  disabled={!selectedLocation || selectedPeople.length === 0}
+                  disabled={!selectedLocation || selectedFaces.length === 0}
                   onClick={handleSubmitAnswer}
                 >
                   Submit Answer

@@ -13,6 +13,7 @@
     "@tensorflow-models/face-landmarks-detection": "^1.0.6",
     "@tensorflow/tfjs": "^4.22.0",
     "adm-zip": "^0.5.16",
+    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "face-api.js": "^0.22.2",
     "jszip": "^3.10.1",

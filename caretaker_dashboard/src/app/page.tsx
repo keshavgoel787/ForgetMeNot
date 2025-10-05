@@ -19,8 +19,9 @@ import {
   Upload,
   ArrowLeft,
 } from "lucide-react";
-import { MoodRadarChart } from "@/components/mood-radar-chart";
+import { ExperienceUsagePieChart } from "@/components/experience-usage-pie-chart";
 import { ExperiencesList } from "@/components/experiences-list";
+import { CreateExperienceForm } from "@/components/create-experience-form";
 
 type Screen = "dashboard" | "patient-name" | "patient-upload" | "face-naming" | "patient-complete" | "experience-form" | "experience-complete";
 
@@ -61,10 +62,13 @@ export default function DashboardPage() {
   const animationFrameId = useRef<number | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   
-  // Multi-person face naming state
-  const [currentPersonIndex, setCurrentPersonIndex] = useState(0);
-  const [allPeople, setAllPeople] = useState<Array<{folder: string, images: string[]}>>([]);
-  const [namedPeople, setNamedPeople] = useState<{[folder: string]: string}>({});
+  // Multi-face naming state
+  const [currentFaceSetIndex, setCurrentFaceSetIndex] = useState(0);
+  const [allFaceSets, setAllFaceSets] = useState<Array<{folder: string, images: string[]}>>([]);
+  const [namedFaces, setNamedFaces] = useState<{[folder: string]: string}>({});
+  
+  // Enlarged bubble modal state
+  const [enlargedBubble, setEnlargedBubble] = useState<Bubble | null>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -74,47 +78,37 @@ export default function DashboardPage() {
   };
 
   const handleUploadComplete = async () => {
-    // Load all people folders - hardcoded for demo
-    const peopleData = [
-      {
-        folder: 'person_1',
-        images: [
-          'face_0005.jpg', 'face_0011.jpg', 'face_0019.jpg', 'face_0031.jpg',
-          'face_0044.jpg', 'face_0045.jpg', 'face_0052.jpg', 'face_0070.jpg',
-          'face_0072.jpg', 'face_0076.jpg', 'face_0084.jpg', 'face_0088.jpg',
-          'face_0089.jpg', 'face_0090.jpg', 'face_0094.jpg', 'face_0096.jpg'
-        ]
-      },
-      {
-        folder: 'person_2',
-        images: [
-          'face_0000.jpg', 'face_0007.jpg', 'face_0020.jpg', 'face_0029.jpg',
-          'face_0035.jpg', 'face_0036.jpg', 'face_0038.jpg', 'face_0039.jpg',
-          'face_0041.jpg', 'face_0047.jpg', 'face_0050.jpg', 'face_0061.jpg',
-          'face_0063.jpg', 'face_0065.jpg', 'face_0080.jpg', 'face_0081.jpg'
-        ]
-      },
-      {
-        folder: 'person_3',
-        images: [
-          'face_0002.jpg', 'face_0006.jpg', 'face_0011.jpg', 'face_0013.jpg',
-          'face_0020.jpg', 'face_0041.jpg', 'face_0042.jpg', 'face_0043.jpg',
-          'face_0047.jpg', 'face_0048.jpg', 'face_0053.jpg', 'face_0063.jpg',
-          'face_0070.jpg', 'face_0072.jpg', 'face_0074.jpg', 'face_0076.jpg'
-        ]
+    try {
+      // Fetch all face images dynamically from the API
+      const response = await fetch('/api/list-faces');
+      if (!response.ok) {
+        throw new Error('Failed to load face images');
       }
-    ];
-    
-    setAllPeople(peopleData);
-    setCurrentPersonIndex(0);
-    loadPersonFaces(peopleData[0]);
-    setCurrentScreen("face-naming");
+      
+      const data = await response.json();
+      const faceSetsData = data.faceSets;
+      
+      if (!faceSetsData || faceSetsData.length === 0) {
+        alert('No face images found in the faces folder');
+        return;
+      }
+      
+      setAllFaceSets(faceSetsData);
+      setCurrentFaceSetIndex(0);
+      loadPersonFaces(faceSetsData[0]);
+      setCurrentScreen("face-naming");
+    } catch (error) {
+      console.error('Error loading faces:', error);
+      alert('Failed to load face images. Please make sure images are in the public/faces folder.');
+    }
   };
   
-  const loadPersonFaces = (person: {folder: string, images: string[]}) => {
-    const loadedFaces: Face[] = person.images.map((img, idx) => ({
-      id: `${person.folder}-${idx}`,
-      imageUrl: `/people/${person.folder}/${img}`,
+  const loadPersonFaces = (faceSet: {folder: string, images: string[]}) => {
+    // Add cache-busting timestamp to force browser to reload images
+    const cacheBuster = Date.now();
+    const loadedFaces: Face[] = faceSet.images.map((img, idx) => ({
+      id: `${faceSet.folder}-${idx}`,
+      imageUrl: `/faces/${faceSet.folder}/${img}?v=${cacheBuster}`,
       name: ""
     }));
     
@@ -154,20 +148,20 @@ export default function DashboardPage() {
   const handleFaceNamingComplete = (name: string) => {
     if (!name.trim()) return;
     
-    // Save the name for current person
-    const currentPerson = allPeople[currentPersonIndex];
-    setNamedPeople(prev => ({
+    // Save the name for current face set
+    const currentFaceSet = allFaceSets[currentFaceSetIndex];
+    setNamedFaces(prev => ({
       ...prev,
-      [currentPerson.folder]: name
+      [currentFaceSet.folder]: name
     }));
     
-    // Move to next person or complete
-    if (currentPersonIndex < allPeople.length - 1) {
-      const nextIndex = currentPersonIndex + 1;
-      setCurrentPersonIndex(nextIndex);
-      loadPersonFaces(allPeople[nextIndex]);
+    // Move to next face set or complete
+    if (currentFaceSetIndex < allFaceSets.length - 1) {
+      const nextIndex = currentFaceSetIndex + 1;
+      setCurrentFaceSetIndex(nextIndex);
+      loadPersonFaces(allFaceSets[nextIndex]);
     } else {
-      // All people named, go to completion
+      // All faces named, go to completion
       // Add the new patient to the patients list if not already present
       if (patientName.trim() && !patients.includes(patientName.trim())) {
         setPatients(prev => [...prev, patientName.trim()]);
@@ -329,9 +323,9 @@ export default function DashboardPage() {
               </Card>
             </div>
 
-            {/* Mood Analytics Section */}
+            {/* Experience Usage Analytics Section */}
             <div className="max-w-4xl mx-auto w-full mt-8">
-              <MoodRadarChart />
+              <ExperienceUsagePieChart />
             </div>
 
             {/* Experiences List Section */}
@@ -413,12 +407,25 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
-              <Button
-                onClick={handleUploadComplete}
-                className="w-full"
-              >
-                Process Files
-              </Button>
+              <div className="flex gap-4">
+                <Button
+                  onClick={handleUploadComplete}
+                  disabled={!uploadedFiles.length}
+                  className="flex-1"
+                >
+                  Process Files
+                </Button>
+                <Button
+                  onClick={() => {
+                    // Skip directly to face naming with mock data
+                    handleUploadComplete();
+                  }}
+                  variant="outline"
+                  className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white border-0"
+                >
+                   Mock Demo
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -438,6 +445,7 @@ export default function DashboardPage() {
                     height: bubble.size,
                     transform: 'translateZ(0)'
                   }}
+                  onClick={() => setEnlargedBubble(bubble)}
                 >
                   <div className="relative w-full h-full group cursor-pointer">
                     <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 opacity-40 blur-lg group-hover:opacity-80 group-hover:scale-110 transition-all duration-500"></div>
@@ -470,7 +478,7 @@ export default function DashboardPage() {
                   </h1>
                   <div className="flex gap-3 items-center">
                     <div className="text-white text-lg font-semibold bg-white/10 backdrop-blur-sm px-6 py-2 rounded-full border border-white/20 animate-in fade-in duration-700">
-                      Person {currentPersonIndex + 1} of {allPeople.length}
+                      Face Set {currentFaceSetIndex + 1} of {allFaceSets.length}
                     </div>
                     <div className="text-white text-lg font-semibold bg-white/10 backdrop-blur-sm px-6 py-2 rounded-full border border-white/20 animate-in fade-in duration-700">
                       {patientName}
@@ -479,7 +487,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="text-center mb-4 animate-in fade-in slide-in-from-top duration-700 delay-200">
                   <p className="text-xl font-semibold text-white/90 drop-shadow-lg">
-                    {faces.length} photo{faces.length !== 1 ? 's' : ''} of this person
+                    {faces.length} photo{faces.length !== 1 ? 's' : ''} of this face set
                   </p>
                 </div>
               </div>
@@ -513,9 +521,61 @@ export default function DashboardPage() {
             {/* Instructions */}
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0">
               <p className="text-white/30 text-xl font-bold text-center">
-                Move your mouse to interact with the bubbles
+                Move your mouse to interact with the bubbles • Click to enlarge
               </p>
             </div>
+
+            {/* Enlarged Bubble Modal */}
+            {enlargedBubble && (
+              <div 
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
+                onClick={() => setEnlargedBubble(null)}
+              >
+                <div 
+                  className="relative animate-in zoom-in-95 duration-500 ease-out"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Animated glow effect */}
+                  <div className="absolute -inset-8 rounded-full bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600 opacity-60 blur-3xl animate-pulse"></div>
+                  
+                  {/* Main enlarged bubble */}
+                  <div className="relative w-[400px] h-[400px] animate-in spin-in-180 duration-700 ease-out">
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 opacity-50 blur-2xl animate-pulse"></div>
+                    <div className="absolute inset-4 rounded-full overflow-hidden border-4 border-white/60 shadow-2xl bg-white/10 backdrop-blur-sm">
+                      <img
+                        src={enlargedBubble.image}
+                        alt="Enlarged face"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999"%3EFace%3C/text%3E%3C/svg%3E';
+                        }}
+                      />
+                    </div>
+                    {/* Shine effect */}
+                    <div className="absolute inset-4 rounded-full bg-gradient-to-br from-white/40 via-transparent to-transparent pointer-events-none"></div>
+                    {/* Sparkle effects */}
+                    <div className="absolute top-8 right-8 w-3 h-3 bg-white rounded-full animate-ping"></div>
+                    <div className="absolute bottom-12 left-12 w-2 h-2 bg-white rounded-full animate-pulse delay-150"></div>
+                    <div className="absolute top-16 left-16 w-2.5 h-2.5 bg-white rounded-full animate-ping delay-300"></div>
+                  </div>
+                  
+                  {/* Close button */}
+                  <button
+                    onClick={() => setEnlargedBubble(null)}
+                    className="absolute -top-4 -right-4 w-12 h-12 rounded-full bg-white/90 hover:bg-white shadow-lg hover:shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 animate-in zoom-in duration-500 delay-200"
+                  >
+                    <svg className="w-6 h-6 text-gray-800" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                  </button>
+                  
+                  {/* Click to close hint */}
+                  <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 text-white/60 text-sm font-medium animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500">
+                    Click anywhere to close
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -551,60 +611,14 @@ export default function DashboardPage() {
         )}
 
         {currentScreen === "experience-form" && (
-          <Card className="max-w-2xl mx-auto w-full">
-            <CardHeader>
-              <CardTitle>Create New Experience</CardTitle>
-              <CardDescription>
-                Set up a new memory experience for a patient
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="patient-select">Select Patient</Label>
-                <Select value={selectedPatient} onValueChange={setSelectedPatient}>
-                  <SelectTrigger id="patient-select">
-                    <SelectValue placeholder="Choose a patient" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {patients.map((patient) => (
-                      <SelectItem key={patient} value={patient}>
-                        {patient}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="topic">General Topic</Label>
-                <Input
-                  id="topic"
-                  placeholder="e.g., Family Reunion, Birthday Party"
-                  value={experienceTopic}
-                  onChange={(e) => setExperienceTopic(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="details">Specific Details</Label>
-                <textarea
-                  id="details"
-                  className="w-full min-h-[200px] px-3 py-2 text-sm rounded-md border border-input bg-background"
-                  placeholder="Enter each detail on a new line:\n• Who was there\n• What happened\n• Where it took place\n• Special moments"
-                  value={bulletPoints}
-                  onChange={(e) => setBulletPoints(e.target.value)}
-                />
-              </div>
-
-              <Button
-                onClick={handleExperienceSubmit}
-                disabled={!selectedPatient || !experienceTopic.trim() || !bulletPoints.trim()}
-                className="w-full"
-              >
-                Create Experience
-              </Button>
-            </CardContent>
-          </Card>
+          <CreateExperienceForm
+            patients={patients}
+            onSuccess={(response) => {
+              console.log("Experience created:", response);
+              // Optionally navigate to a success screen or stay on the form
+            }}
+            onCancel={resetToDashboard}
+          />
         )}
 
         {currentScreen === "experience-complete" && (
