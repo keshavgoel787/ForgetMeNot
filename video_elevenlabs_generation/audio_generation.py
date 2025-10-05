@@ -6,8 +6,10 @@ url = "https://forgetmenot-eq7i.onrender.com/text-to-speech"
 
 headers = {"Content-Type": "application/json"}
 
+data = {"text": "Can you try to remember me?","name": "Tyler"}
 
-async def get_audio(data: dict = {"text": "Can you try to remember me?","name": "Tyler"}):
+
+async def get_audio(data: dict):
     response = requests.post(url, json=data, headers=headers)
     
     if response.status_code == 200:
@@ -25,8 +27,8 @@ async def play_talking_video(length = 1):
     await asyncio.sleep(length)
     return "✅ done talking"
 
-async def generate_video():
-    audio = asyncio.create_task(get_audio())
+async def generate_video(data: dict):
+    audio = asyncio.create_task(get_audio(data))
 
     while not audio.done():
         print("Playing sitting still video") # some visual feedback
@@ -38,4 +40,4 @@ async def generate_video():
         print(await play_talking_video(result))
         print("Playing sitting still video") # some visual feedback
 
-asyncio.run(generate_video())
+asyncio.run(generate_video(data))
