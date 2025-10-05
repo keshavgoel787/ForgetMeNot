@@ -258,22 +258,24 @@ export default function DashboardPage() {
 
   return (
     <div className="flex min-h-screen w-full flex-col">
-      <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
-        <div className="flex items-center gap-2">
-          <Heart className="h-6 w-6 text-red-500" />
-          <span className="font-bold text-lg">Caregiver Dashboard</span>
-        </div>
-        {currentScreen !== "dashboard" && (
-          <Button
-            variant="ghost"
-            onClick={resetToDashboard}
-            className="ml-auto"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Dashboard
-          </Button>
-        )}
-      </header>
+      {currentScreen !== "face-naming" && (
+        <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-md px-4 md:px-6">
+          <div className="flex items-center gap-2">
+            <Heart className="h-6 w-6 text-red-500" />
+            <span className="font-bold text-lg">Caregiver Dashboard</span>
+          </div>
+          {currentScreen !== "dashboard" && (
+            <Button
+              variant="ghost"
+              onClick={resetToDashboard}
+              className="ml-auto"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Dashboard
+            </Button>
+          )}
+        </header>
+      )}
 
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         {currentScreen === "dashboard" && (
@@ -521,7 +523,6 @@ export default function DashboardPage() {
             {/* Instructions */}
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0">
               <p className="text-white/30 text-xl font-bold text-center">
-                Move your mouse to interact with the bubbles • Click to enlarge
               </p>
             </div>
 

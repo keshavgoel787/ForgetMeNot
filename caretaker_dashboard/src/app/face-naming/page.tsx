@@ -120,12 +120,16 @@ export default function FaceNamingPage() {
       // Add cache-busting to force browser to reload new images
       const cacheBuster = Date.now();
       const newBubbles: Bubble[] = currentFolder.imageUrls.map((imageUrl, index) => {
-        const angle = (index / currentFolder.imageUrls.length) * Math.PI * 2;
-        const radius = 200;
+        // Create random scattered positions instead of circular
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
-        const x = centerX + Math.cos(angle) * radius;
-        const y = centerY + Math.sin(angle) * radius;
+        const scatterRadius = 300; // How spread out the bubbles should be
+
+        // Generate random angle and distance for more natural scatter
+        const angle = Math.random() * Math.PI * 2;
+        const distance = Math.random() * scatterRadius;
+        const x = centerX + Math.cos(angle) * distance;
+        const y = centerY + Math.sin(angle) * distance;
         
         // Add cache buster to image URL
         const imageWithCacheBuster = imageUrl.includes('?') 
@@ -184,8 +188,8 @@ export default function FaceNamingPage() {
           if (distanceSq < repelRadiusSq && distanceSq > 0) {
             const distance = Math.sqrt(distanceSq);
             const force = (repelRadius - distance) / repelRadius;
-            const pushX = (dx / distance) * force * 40; // Reduced from 80
-            const pushY = (dy / distance) * force * 40; // Reduced from 80
+            const pushX = (dx / distance) * force * 20; // Reduced from 40
+            const pushY = (dy / distance) * force * 20; // Reduced from 40
             targetX = bubble.originalX + pushX;
             targetY = bubble.originalY + pushY;
           }
