@@ -1,47 +1,65 @@
-import os, uuid, json, pandas as pd
-from dotenv import load_dotenv
-import snowflake.connector
+"""
+Upload memory clip metadata to Snowflake MEMORY_VAULT table.
 
-# Load environment variables
-load_dotenv()
+This script reads metadata from a CSV file and uploads it to Snowflake,
+generating embeddings using Snowflake Cortex for semantic search.
+"""
 
-# Connect to Snowflake
-conn = snowflake.connector.connect(
-    user=os.getenv("SNOWFLAKE_USER"),
-    password=os.getenv("SNOWFLAKE_PASSWORD"),
-    account=os.getenv("SNOWFLAKE_ACCOUNT"),
-    warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
-    database=os.getenv("SNOWFLAKE_DATABASE"),
-    schema=os.getenv("SNOWFLAKE_SCHEMA")
-)
-cursor = conn.cursor()
-print("✅ Connected to Snowflake")
-
-# Load metadata CSV
-df = pd.read_csv("metadata.csv")
-
-# Insert each clip into Snowflake (no embeddings yet)
-for _, row in df.iterrows():
-    cursor.execute("""
-        INSERT INTO MEMORY_VAULT (
-            id, title, clip_name, description, scene_label, emotion_label, context_tags, clip_url
-        )
-        SELECT %s, %s, %s, %s, %s, %s, PARSE_JSON(%s), %s
-    """, (
-        str(uuid.uuid4()),
-        row["title"],
-        row["clip_name"],
-        row["description"],
-        row["scene_label"],
-        row["emotion_label"],
-        json.dumps(eval(row["context_tags"])),
-        f"https://storage.example.com/{row['clip_name']}"
-    ))
+from lib.config import Config
+from lib.snowflake_client import SnowflakeClient
+from lib.data_processor import load_metadata, prepare_clip_data
 
 
-conn.commit()
-print("✅ All clips inserted successfully (no embeddings).")
+def process_clips(df, client):
+    """
+    Process all clips from DataFrame and insert into Snowflake.
 
-# Close connection
-cursor.close()
-conn.close()
+    Args:
+        df: pandas DataFrame with clip metadata
+        client: SnowflakeClient instance
+
+    Returns:
+        Tuple of (success_count, failure_count)
+    """
+    success_count = 0
+    failure_count = 0
+
+    for _, row in df.iterrows():
+        clip_data = prepare_clip_data(row)
+
+        if clip_data is None:
+            failure_count += 1
+            continue
+
+        print(f"🧩 Processing: {clip_data['clip_name']}")
+        print(f"   {clip_data['description'][:60]}...")
+
+        if client.insert_clip_with_embedding(clip_data):
+            print(f"✅ Inserted {clip_data['clip_name']} with embedding")
+            success_count += 1
+        else:
+            failure_count += 1
+
+    return success_count, failure_count
+
+
+def main():
+    """Main execution function."""
+    # Load metadata
+    df = load_metadata(Config.METADATA_CSV_PATH)
+
+    # Upload clips using context manager
+    with SnowflakeClient() as client:
+        success_count, failure_count = process_clips(df, client)
+        client.commit()
+
+    # Print summary
+    print("\n" + "="*50)
+    print(f"🎉 Upload complete!")
+    print(f"   ✅ Success: {success_count}")
+    print(f"   ❌ Failed:  {failure_count}")
+    print("="*50)
+
+
+if __name__ == "__main__":
+    main()
