@@ -1,0 +1,9 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.9.2
+snowflake-connector-python==3.17.4
+google-cloud-storage==2.18.2
+google-generativeai==0.8.5
+python-dotenv==1.0.0
+pandas==2.2.3
+aiofiles==24.1.0

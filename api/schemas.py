@@ -40,6 +40,39 @@ class RetrievalResponse(BaseModel):
 
 
 # ============================================================================
+# Therapist Prompt & AI Memory Generation Schemas
+# ============================================================================
+
+class TherapistPrompt(BaseModel):
+    """Therapist's memory recreation prompt"""
+    patient_id: Optional[str] = Field(default=None, description="Patient identifier")
+    general_description: str = Field(..., description="General memory description (e.g., 'me and Anna at the beach')")
+    specific_scenes: List[str] = Field(..., description="Specific scene descriptions (e.g., ['holding hands', 'eating ice cream'])")
+    top_k_per_scene: int = Field(default=3, ge=1, le=10, description="Number of memories to retrieve per scene")
+
+
+class SceneMemories(BaseModel):
+    """Memories for a specific scene"""
+    scene_description: str
+    memories: List[MemoryResult]
+    ai_narrative: str = Field(..., description="AI-generated narrative for this scene")
+
+
+class AIMemoryResponse(BaseModel):
+    """Complete AI-generated memory response"""
+    model_config = {"protected_namespaces": ()}
+
+    status: str = Field(default="success")
+    patient_id: Optional[str] = None
+    general_description: str
+    scenes: List[SceneMemories] = Field(..., description="Memories and narratives for each scene")
+    overall_narrative: str = Field(..., description="Complete AI-generated memory story")
+    total_memories_found: int
+    session_id: str = Field(..., description="Unique session identifier for tracking")
+    model_used: str = Field(default="gemini-2.5-flash")
+
+
+# ============================================================================
 # GCS Metadata Building Schemas
 # ============================================================================
 
