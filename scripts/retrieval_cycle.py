@@ -43,7 +43,7 @@ def search_memories_by_query(query: str, client: SnowflakeClient, top_k: int = 5
             file_name,
             file_type,
             description,
-            people,
+            ARRAY_TO_STRING(people, ',') AS people,
             event_summary,
             file_url,
             VECTOR_COSINE_SIMILARITY(
