@@ -183,21 +183,6 @@
           100% { transform: scale(1); }
         }
 
-        .memory-bubble.expanding {
-          transform: scale(1.0);
-        }
-
-        .memory-bubble-orbit {
-          width: 100%;
-          height: 100%;
-          position: absolute;
-          top: 0;
-          left: 0;
-          /* Each will have its own animation-delay and rotation */
-          animation: orbitSpin 20s linear infinite;
-          /* Will be rotated to initial angle in inline style */
-        }
-
         @keyframes orbitSpin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
