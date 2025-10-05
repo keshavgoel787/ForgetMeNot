@@ -66,6 +66,7 @@ app.add_middleware(
         "https://forgetmenotclient.onrender.com",
         "https://forgetmenot-p4pb.onrender.com",
         "https://forget-me-not.tech",
+        "https://www.forget-me-not.tech",  # With www prefix
         "http://localhost:5173",  # Local development
         "http://localhost:3000",  # Alternative local port
     ],

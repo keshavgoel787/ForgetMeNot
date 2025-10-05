@@ -306,7 +306,7 @@ async def patient_query(
 
         # Execute in parallel
         (display_mode, media_info), narration_text = await asyncio.gather(
-            asyncio.to_thread(classify_task),
+            classify_task(),
             narration_task()
         )
 

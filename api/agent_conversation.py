@@ -220,7 +220,7 @@ async def talk_to_agent(
             patient_id, f"agent_{agent.name.lower()}", max_turns=5
         )
 
-        # Step 5: Generate response with Avery's personality
+        # Step 5: Generate response with agent's personality
         prompt = f"""You are {agent.name}, {agent.description}
 
 Your personality: {agent.personality}
@@ -230,22 +230,23 @@ Your traits and preferences:
 
 The person you're talking to just said: "{transcription}"
 
-{f"Here are some of their memories about {topic}:" if memories else "You're having a general conversation."}
+{f"Here are YOUR memories and experiences about {topic} that you want to share with them:" if memories else "You're having a general conversation."}
 {memories_context}
 
 Recent conversation:
 {conversation_context}
 
 INSTRUCTIONS:
-- Respond as {agent.name} with your warm, empathetic personality
-- If there are memories, point out specific details you see and help them reminisce
-- If no specific memories, still be supportive and engage naturally
-- Use "I" to refer to yourself as {agent.name}
-- Keep it conversational - 2-3 sentences
-- Be slightly playful but calming
+- You're {agent.name}, sharing YOUR OWN experiences and memories with the person
+- The memories shown above are YOUR memories - talk about them as if YOU experienced them
+- Use "I" when talking about these experiences (e.g., "I remember when I went to Disney..." or "I had so much fun at the beach...")
+- Be conversational and personal - you're sharing your life with them
+- Reference specific details from YOUR memories naturally
+- Keep it to 2-3 sentences
+- Match your personality: {agent.personality}
 - Vary your responses - don't always start the same way
 
-Respond as {agent.name} (2-3 sentences):"""
+Respond as {agent.name} sharing your own experiences (2-3 sentences):"""
 
         response_text = generate_text(
             prompt,
