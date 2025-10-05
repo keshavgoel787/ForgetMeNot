@@ -1,94 +1,93 @@
-"""
-Upload memory clip metadata to Snowflake MEMORY_VAULT table.
+import os, uuid, pandas as pd, json
+import snowflake.connector
+from dotenv import load_dotenv
 
-This script reads metadata from a CSV file and uploads it to Snowflake,
-generating embeddings using Snowflake Cortex for semantic search.
-"""
+load_dotenv()
 
-from lib.config import Config
-from lib.snowflake_client import SnowflakeClient
-from lib.data_processor import load_metadata, prepare_clip_data
+ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
 
+def main():
+    conn = snowflake.connector.connect(
+        user=os.getenv("SNOWFLAKE_USER"),
+        password=os.getenv("SNOWFLAKE_PASSWORD"),
+        account=ACCOUNT,
+        warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
+        database=os.getenv("SNOWFLAKE_DATABASE"),
+        schema=os.getenv("SNOWFLAKE_SCHEMA")
+    )
+    cur = conn.cursor()
 
-def process_clips(df, client, parallel=True, max_workers=4):
-    """
-    Process all clips from DataFrame and insert into Snowflake.
+    # Clear existing data to avoid duplicates
+    print("🗑️  Clearing existing data from MEMORY_VAULT...")
+    cur.execute("TRUNCATE TABLE MEMORY_VAULT")
+    conn.commit()
 
-    Args:
-        df: pandas DataFrame with clip metadata
-        client: SnowflakeClient instance
-        parallel: If True, use parallel processing (default: True)
-        max_workers: Number of parallel workers (default: 4)
+    df = pd.read_csv("data/metadata.csv")
+    print(f"📊 Uploading {len(df)} records to MEMORY_VAULT...")
+    print("   Using Snowflake CORTEX.EMBED_TEXT_768 for embeddings...")
 
-    Returns:
-        Tuple of (success_count, failure_count)
-    """
-    # Prepare all clip data
-    clips_data = []
+    success_count = 0
     skip_count = 0
 
-    for _, row in df.iterrows():
-        clip_data = prepare_clip_data(row)
-        if clip_data is None:
+    for idx, row in df.iterrows():
+        desc = str(row["description"]).strip() if pd.notna(row["description"]) else ""
+        summary = str(row.get("event_summary", "")).strip() if pd.notna(row.get("event_summary", "")) else ""
+        file_type = str(row["file_type"]).strip() if pd.notna(row["file_type"]) else ""
+        file_url = str(row["file_url"]).strip() if pd.notna(row["file_url"]) else ""
+
+        # Remove surrounding quotes if present (from CSV parsing)
+        if desc.startswith('"') and desc.endswith('"'):
+            desc = desc[1:-1]
+        if summary.startswith('"') and summary.endswith('"'):
+            summary = summary[1:-1]
+
+        # Generate embedding using description (prioritize description over summary)
+        text_for_embedding = desc or summary
+
+        if not text_for_embedding or text_for_embedding == "nan":
+            print(f"  ⚠️  Skipping {row['file_name']} - no text content")
             skip_count += 1
             continue
 
-        print(f"🧩 Prepared: {clip_data['clip_name']}")
-        print(f"   {clip_data['description'][:60]}...")
-        clips_data.append(clip_data)
+        # Parse people JSON string to array
+        people_json = row["people"] if pd.notna(row["people"]) else "[]"
+        people_list = json.loads(people_json)
+        people_sql = json.dumps(people_list)
 
-    if not clips_data:
-        return 0, skip_count
+        # Use Snowflake CORTEX function to generate embedding directly in SQL
+        sql = """
+            INSERT INTO MEMORY_VAULT
+            (id, event_name, file_name, file_type, description, people, event_summary, file_url, embedding)
+            SELECT %s,%s,%s,%s,%s,PARSE_JSON(%s)::ARRAY,%s,%s,
+                   SNOWFLAKE.CORTEX.EMBED_TEXT_768('e5-base-v2', %s)
+        """
 
-    # Insert clips (parallel or sequential)
-    print(f"\n{'⚡ Parallel' if parallel else '📝 Sequential'} upload starting...")
+        try:
+            cur.execute(sql, (
+                str(uuid.uuid4()),
+                row["event_name"] if pd.notna(row["event_name"]) else "",
+                row["file_name"] if pd.notna(row["file_name"]) else "",
+                file_type,
+                desc,
+                people_sql,
+                summary,
+                file_url,
+                text_for_embedding
+            ))
+            success_count += 1
+        except Exception as e:
+            print(f"  ❌ Error uploading {row['file_name']}: {e}")
+            skip_count += 1
+            continue
 
-    if parallel:
-        success, failure = client.batch_insert_clips(clips_data, max_workers)
-    else:
-        success = 0
-        failure = 0
-        for clip in clips_data:
-            if client.insert_clip_with_embedding(clip):
-                print(f"✅ Inserted {clip['clip_name']} with embedding")
-                success += 1
-            else:
-                failure += 1
+        if (idx + 1) % 10 == 0:
+            conn.commit()  # Commit every 10 records
+            print(f"  ✓ Processed {idx + 1}/{len(df)} records ({success_count} uploaded, {skip_count} skipped)")
 
-    return success, failure + skip_count
-
-
-def main(parallel=True, max_workers=4):
-    """
-    Main execution function.
-
-    Args:
-        parallel: Enable parallel processing (default: True)
-        max_workers: Number of parallel workers (default: 4)
-    """
-    import time
-
-    # Load metadata
-    df = load_metadata(Config.METADATA_CSV_PATH)
-
-    # Upload clips using context manager
-    start_time = time.time()
-
-    with SnowflakeClient() as client:
-        success_count, failure_count = process_clips(
-            df, client, parallel=parallel, max_workers=max_workers
-        )
-        client.commit()
-
-    elapsed = time.time() - start_time
-
-    # Print summary
-    print("\n" + "="*50)
-    print(f"🎉 Upload complete in {elapsed:.2f}s!")
-    print(f"   ✅ Success: {success_count}")
-    print(f"   ❌ Failed:  {failure_count}")
-    print("="*50)
-
+    conn.commit()
+    print(f"✅ Upload complete: {success_count} records uploaded, {skip_count} skipped")
+    cur.close()
+    conn.close()
 
 if __name__ == "__main__":
     main()
