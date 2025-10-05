@@ -2,9 +2,12 @@
 Snowflake Upload API routes
 """
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from google.cloud import storage
 import sys
 import os
+
+# Use shared GCS client
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts'))
+from scripts.lib.gcs_client import get_gcs_client
 import pandas as pd
 import json
 import uuid
@@ -167,10 +170,8 @@ async def upload_file_to_gcs(
                 detail=f"Invalid file type. Supported: {valid_video_extensions + valid_image_extensions}"
             )
 
-        # Initialize GCS client
-        bucket_name = os.getenv("GCS_BUCKET", "forgetmenot-videos")
-        client = storage.Client()
-        bucket = client.bucket(bucket_name)
+        # Use shared GCS client
+        gcs_client, bucket = get_gcs_client()
 
         # Create blob path
         blob_name = f"{event_name}/{file.filename}"
@@ -181,6 +182,7 @@ async def upload_file_to_gcs(
         blob.upload_from_string(contents, content_type=file.content_type)
 
         # Generate public URL
+        bucket_name = os.getenv("GCS_BUCKET", "forgetmenot-videos")
         file_url = f"https://storage.googleapis.com/{bucket_name}/{blob_name}"
 
         return FileUploadResponse(

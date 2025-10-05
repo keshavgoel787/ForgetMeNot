@@ -1,24 +1,14 @@
 import os, json, csv
-from google.cloud import storage
 from urllib.parse import quote
 from pathlib import Path
 from dotenv import load_dotenv
 
+# Use shared GCS client
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from lib.gcs_client import get_gcs_client
+
 load_dotenv()
-
-BUCKET = os.getenv("GCS_BUCKET", "forgetmenot-videos")
-
-# Lazy load GCS client to avoid import-time errors
-_client = None
-_bucket = None
-
-def get_gcs_client():
-    """Get or create GCS client"""
-    global _client, _bucket
-    if _client is None:
-        _client = storage.Client()
-        _bucket = _client.bucket(BUCKET)
-    return _client, _bucket
 
 def normalize_key(filename):
     """Normalize filename to match context.json keys by replacing space before AM/PM with non-breaking space"""

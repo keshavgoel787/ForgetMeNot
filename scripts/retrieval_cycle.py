@@ -13,13 +13,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scripts.lib.config import Config
 from scripts.lib.snowflake_client import SnowflakeClient
-import google.generativeai as genai
+from scripts.lib.gemini_client import generate_text
 from dotenv import load_dotenv
 
 load_dotenv()
-
-# Configure Gemini
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 
 def search_memories_by_query(query: str, client: SnowflakeClient, top_k: int = 5):
@@ -176,32 +173,13 @@ def generate_answer_with_gemini(query: str, memories_context: str, memories: lis
     )
 
     try:
-        # Try different model names based on what's available
-        model_names_to_try = [model_name, "models/gemini-2.5-flash", "models/gemini-2.5-pro", "models/gemini-2.0-flash"]
-
-        last_error = None
-        for model_to_try in model_names_to_try:
-            try:
-                model = genai.GenerativeModel(model_to_try)
-                response = model.generate_content(
-                    prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        temperature=0.7,
-                        max_output_tokens=300,
-                    )
-                )
-                # Access response text safely
-                if response.candidates:
-                    return response.candidates[0].content.parts[0].text
-                else:
-                    raise Exception("No response generated")
-            except Exception as e:
-                last_error = e
-                continue
-
-        # If all failed, raise the last error
-        if last_error:
-            raise last_error
+        # Use shared Gemini client with fallback logic
+        return generate_text(
+            prompt,
+            model_name=model_name.replace("models/", ""),
+            temperature=0.7,
+            max_tokens=300
+        )
 
     except Exception as e:
         print(f"❌ Error generating answer with Gemini: {e}")
