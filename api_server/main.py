@@ -5,6 +5,7 @@ Endpoints:
 2. POST /generate-context - Upload names.json, run name conversion + context generation
 3. POST /text-to-speech - Generate speech in a person's voice
 4. GET /voices - List all available voice clones
+5. POST /text-to-sound - Generate sound effects or music from text description
 """
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -339,6 +340,11 @@ class TextToSpeechRequest(BaseModel):
     text: str
     name: str
 
+class TextToSoundRequest(BaseModel):
+    text: str
+    duration_seconds: float = None
+    prompt_influence: float = 0.3
+
 def get_elevenlabs_voices() -> dict:
     """Get all voices from ElevenLabs and create name mapping"""
     api_key = os.getenv('ELEVENLABS_API_KEY')
@@ -471,6 +477,90 @@ async def list_voices():
         "voices": list(voice_mapping.keys()),
         "count": len(voice_mapping)
     }
+
+# ============================================================================
+# TEXT-TO-SOUND EFFECTS/MUSIC ENDPOINT
+# ============================================================================
+
+@app.post("/text-to-sound")
+async def text_to_sound(request: TextToSoundRequest):
+    """
+    Generate sound effects or music from text description using ElevenLabs
+    
+    Request body:
+    {
+        "text": "Dramatic orchestral music with rising tension",
+        "duration_seconds": 10,  // Optional: 0.5-30 seconds, auto if not specified
+        "prompt_influence": 0.5  // Optional: 0-1, defaults to 0.3
+    }
+    
+    Returns: MP3 audio file of the generated sound/music
+    
+    Examples:
+    - "Epic cinematic music with drums and strings"
+    - "Gentle rainfall with distant thunder"
+    - "Upbeat electronic dance music"
+    - "Creepy horror ambience with whispers"
+    - "Glass shattering on concrete"
+    """
+    
+    api_key = os.getenv('ELEVENLABS_API_KEY')
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="ELEVENLABS_API_KEY not configured"
+        )
+    
+    # Validate parameters
+    if request.duration_seconds is not None:
+        if request.duration_seconds < 0.5 or request.duration_seconds > 30:
+            raise HTTPException(
+                status_code=400,
+                detail="duration_seconds must be between 0.5 and 30 seconds"
+            )
+    
+    if request.prompt_influence < 0 or request.prompt_influence > 1:
+        raise HTTPException(
+            status_code=400,
+            detail="prompt_influence must be between 0 and 1"
+        )
+    
+    url = "https://api.elevenlabs.io/v1/sound-generation"
+    
+    headers = {
+        "xi-api-key": api_key,
+        "Content-Type": "application/json"
+    }
+    
+    # Build payload
+    payload = {
+        "text": request.text,
+        "model_id": "eleven_text_to_sound_v2",
+        "prompt_influence": request.prompt_influence
+    }
+    
+    if request.duration_seconds is not None:
+        payload["duration_seconds"] = request.duration_seconds
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"ElevenLabs API error: {response.text}"
+            )
+        
+        # Return as streaming MP3
+        return StreamingResponse(
+            io.BytesIO(response.content),
+            media_type="audio/mpeg",
+            headers={
+                "Content-Disposition": f"attachment; filename=sound_effect.mp3"
+            }
+        )
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Request failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
