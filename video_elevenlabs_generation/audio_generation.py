@@ -1,27 +1,28 @@
 import requests
 import asyncio
+from mutagen.mp3 import MP3
 
 url = "https://forgetmenot-eq7i.onrender.com/text-to-speech"
 
 headers = {"Content-Type": "application/json"}
 
 
-async def get_audio(data: dict = {"text": "nice time to fly, huh?","name": "Tyler"}):
+async def get_audio(data: dict = {"text": "Can you try to remember me?","name": "Tyler"}):
     response = requests.post(url, json=data, headers=headers)
     
     if response.status_code == 200:
         with open("output.mp3", "wb") as f:
             f.write(response.content)
         print("✅ Audio saved as output.mp3")
-        return True
+        return MP3("output.mp3").info.length
     else:
         print(f"❌ Error: {response.status_code}")
         print(response.text)
-        return False
+        return 0
 
-async def play_talking_video():
+async def play_talking_video(length = 1):
     print("Playing talking video") # some visual feedback
-    await asyncio.sleep(2.5)  # simulate talking
+    await asyncio.sleep(length)
     return "✅ done talking"
 
 async def generate_video():
@@ -29,11 +30,12 @@ async def generate_video():
 
     while not audio.done():
         print("Playing sitting still video") # some visual feedback
-        await asyncio.sleep(0.2)  # to not overflow terminal
+        await asyncio.sleep(0.2)
 
-    result = await audio  # get result when done
+    result = await audio
 
-    if result:
-        print(await play_talking_video())
+    if result != 0:
+        print(await play_talking_video(result))
+        print("Playing sitting still video") # some visual feedback
 
 asyncio.run(generate_video())
