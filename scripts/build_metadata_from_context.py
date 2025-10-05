@@ -7,8 +7,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BUCKET = os.getenv("GCS_BUCKET", "forgetmenot-videos")
-client = storage.Client()
-bucket = client.bucket(BUCKET)
+
+# Lazy load GCS client to avoid import-time errors
+_client = None
+_bucket = None
+
+def get_gcs_client():
+    """Get or create GCS client"""
+    global _client, _bucket
+    if _client is None:
+        _client = storage.Client()
+        _bucket = _client.bucket(BUCKET)
+    return _client, _bucket
 
 def normalize_key(filename):
     """Normalize filename to match context.json keys by replacing space before AM/PM with non-breaking space"""
@@ -22,6 +32,7 @@ def normalize_key(filename):
 
 def build_rows():
     rows = []
+    client, bucket = get_gcs_client()
     blobs = list(bucket.list_blobs())
     events = set("/".join(blob.name.split("/")[:1]) for blob in blobs if "/" in blob.name)
 
