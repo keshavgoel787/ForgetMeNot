@@ -46,10 +46,20 @@ const ImagePlaygroundUI = () => {
   const [hasRecordingPermission, setHasRecordingPermission] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const [loadingTextIndex, setLoadingTextIndex] = useState(0);
 
   const memories: Memory[] = [
     avery1, avery2, avery3, college1, college2, disney1, ski1, football1, tyler1
   ] as Memory[];
+
+  const loadingTexts = [
+    'loading...',
+    'remembering...',
+    'thinking...',
+    'searching...',
+    'recalling...',
+    'reflecting...'
+  ];
 
   const filteredMemories = selectedTopic 
     ? memories.filter(m => m.topic.toLowerCase() === selectedTopic.toLowerCase())
@@ -95,6 +105,20 @@ const ImagePlaygroundUI = () => {
     { id: 'bg9', x: 82, y: 35, size: 64, delay: 2.2, icon: '🎲' },
     { id: 'bg10', x: 90, y: 88, size: 68, delay: 0.3, icon: '🎰' }
   ];
+
+  // Rotate loading text every 3 seconds
+  useEffect(() => {
+    if (!isTransitioning) {
+      setLoadingTextIndex(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setLoadingTextIndex((prev) => (prev + 1) % loadingTexts.length);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [isTransitioning]);
 
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -1030,10 +1054,12 @@ const ImagePlaygroundUI = () => {
               left: '50%',
               zIndex: 150,
               pointerEvents: 'none',
-              width: '120px',
-              height: '120px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '0px',
               marginLeft: '-60px',
-              marginTop: '-60px'
+              marginTop: '-70px'
             }}
           >
             <svg width="120" height="120" viewBox="0 0 160 160" style={{ display: 'block' }}>
@@ -1077,6 +1103,22 @@ const ImagePlaygroundUI = () => {
                 />
               </g>
             </svg>
+            <motion.div
+              key={loadingTextIndex}
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ duration: 0.5 }}
+              style={{
+                color: 'rgba(200, 200, 200, 0.7)',
+                fontSize: '14px',
+                fontWeight: '400',
+                textAlign: 'center',
+                letterSpacing: '0.5px'
+              }}
+            >
+              {loadingTexts[loadingTextIndex]}
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
