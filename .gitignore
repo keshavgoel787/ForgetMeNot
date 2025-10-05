@@ -7,6 +7,8 @@ ENV/
 .env
 .env.local
 
+forgetmenot-474120-bf3653aac56e.json
+
 # Python
 __pycache__/
 *.py[cod]
