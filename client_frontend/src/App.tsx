@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Mic } from 'lucide-react';
 
 // Import memory data
 import avery1 from './testdata/avery1.json';
@@ -23,7 +23,7 @@ interface Memory {
 const ImagePlaygroundUI = () => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [currentMemoryIndex, setCurrentMemoryIndex] = useState(0);
   const [displayMode, setDisplayMode] = useState<'3-pic' | '4-pic' | '5-pic' | 'video' | 'vertical-video'>('video');
@@ -33,6 +33,7 @@ const ImagePlaygroundUI = () => {
   const [showContent, setShowContent] = useState(false);
   const recognitionRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const wasInterrupted = useRef(false);
 
   const memories: Memory[] = [
     avery1, avery2, avery3, college1, college2, disney1, ski1, football1, tyler1
@@ -80,13 +81,12 @@ const ImagePlaygroundUI = () => {
         }
         if (finalTranscript) {
           setTranscript(finalTranscript);
-          setIsListening(false);
-          playback(finalTranscript);
+          // Don't auto-advance - user must click mic to advance
         }
       };
 
       recognitionRef.current.onend = () => {
-        if (isListening && !isPlaying) {
+        if (isListening && !isPlayingAudio) {
           recognitionRef.current.start();
         }
       };
@@ -97,22 +97,13 @@ const ImagePlaygroundUI = () => {
         recognitionRef.current.stop();
       }
     };
-  }, [isListening, isPlaying]);
+  }, [isListening, isPlayingAudio]);
 
-  const playback = (text: string) => {
-    setIsPlaying(true);
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.onend = () => {
-      setIsPlaying(false);
-      setTranscript('');
-      setTimeout(() => {
-        setIsListening(true);
-        if (recognitionRef.current) {
-          recognitionRef.current.start();
-        }
-      }, 500);
-    };
-    window.speechSynthesis.speak(utterance);
+  const advanceToNextMemory = () => {
+    if (!selectedTopic) return;
+    
+    const nextIndex = (currentMemoryIndex + 1) % filteredMemories.length;
+    loadMemory(nextIndex);
   };
 
   const fetchAndPlayAudio = async (text: string) => {
@@ -170,17 +161,17 @@ const ImagePlaygroundUI = () => {
       
       audio.onended = () => {
         console.log('Audio ended');
-        setIsPlaying(false);
+        setIsPlayingAudio(false);
       };
       
       audio.onerror = (e) => {
         console.error('Audio playback error:', e);
         setIsLoadingAudio(false);
         setShowContent(true);
-        setIsPlaying(false);
+        setIsPlayingAudio(false);
       };
       
-      setIsPlaying(true);
+      setIsPlayingAudio(true);
       console.log('Attempting to play audio...');
       await audio.play();
       console.log('Audio play() called successfully');
@@ -189,7 +180,7 @@ const ImagePlaygroundUI = () => {
       console.error('Error in fetchAndPlayAudio:', error);
       setIsLoadingAudio(false);
       setShowContent(true);
-      setIsPlaying(false);
+      setIsPlayingAudio(false);
     }
   };
 
@@ -205,14 +196,34 @@ const ImagePlaygroundUI = () => {
     fetchAndPlayAudio(memory.text);
   };
 
-  const handlePrevious = () => {
-    const newIndex = currentMemoryIndex > 0 ? currentMemoryIndex - 1 : filteredMemories.length - 1;
-    loadMemory(newIndex);
-  };
-
-  const handleNext = () => {
-    const newIndex = currentMemoryIndex < filteredMemories.length - 1 ? currentMemoryIndex + 1 : 0;
-    loadMemory(newIndex);
+  const handleMicClick = () => {
+    if (isPlayingAudio) {
+      // Interrupt audio and start listening
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setIsPlayingAudio(false);
+      wasInterrupted.current = true;
+      setIsListening(true);
+      if (recognitionRef.current) {
+        recognitionRef.current.start();
+      }
+    } else if (isListening) {
+      // Stop listening and advance to next memory
+      setIsListening(false);
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      // Advance to next memory
+      advanceToNextMemory();
+    } else {
+      // Start listening
+      setIsListening(true);
+      if (recognitionRef.current) {
+        recognitionRef.current.start();
+      }
+    }
   };
 
   const handleTopicClick = (topic: string) => {
@@ -230,10 +241,7 @@ const ImagePlaygroundUI = () => {
   };
 
   useEffect(() => {
-    setIsListening(true);
-    if (recognitionRef.current) {
-      recognitionRef.current.start();
-    }
+    // Don't auto-start listening on mount
   }, []);
 
   return (
@@ -252,31 +260,7 @@ const ImagePlaygroundUI = () => {
         <div key={circle.id} style={{ position: 'absolute', left: `${circle.x}%`, top: `${circle.y}%`, width: `${circle.size}px`, height: `${circle.size}px`, borderRadius: '50%', background: 'linear-gradient(135deg, rgba(0, 122, 255, 0.3), rgba(10, 132, 255, 0.2))', border: '2px solid rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: `${circle.size * 0.5}px`, animation: `floatBackground 4s ease-in-out infinite`, animationDelay: `${circle.delay}s`, zIndex: 0, opacity: 0.7 }}>{circle.icon}</div>
       ))}
 
-      <div style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '40px' }}>
-        {/* Left Arrow */}
-        {selectedTopic && filteredMemories.length > 1 && (
-          <button
-            onClick={handlePrevious}
-            disabled={isLoadingAudio}
-            style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.15)',
-              backdropFilter: 'blur(10px)',
-              border: '2px solid rgba(255, 255, 255, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: isLoadingAudio ? 'not-allowed' : 'pointer',
-              transition: 'all 0.3s',
-              opacity: isLoadingAudio ? 0.5 : 1
-            }}
-          >
-            <ChevronLeft size={32} color="white" />
-          </button>
-        )}
-
+      <div style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ 
           width: displayMode === 'vertical-video' ? '320px' : '700px', 
           height: displayMode === 'vertical-video' ? '500px' : '400px', 
@@ -376,30 +360,6 @@ const ImagePlaygroundUI = () => {
             </div>
           )}
         </div>
-
-        {/* Right Arrow */}
-        {selectedTopic && filteredMemories.length > 1 && (
-          <button
-            onClick={handleNext}
-            disabled={isLoadingAudio}
-            style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.15)',
-              backdropFilter: 'blur(10px)',
-              border: '2px solid rgba(255, 255, 255, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: isLoadingAudio ? 'not-allowed' : 'pointer',
-              transition: 'all 0.3s',
-              opacity: isLoadingAudio ? 0.5 : 1
-            }}
-          >
-            <ChevronRight size={32} color="white" />
-          </button>
-        )}
       </div>
 
       <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 50 }}>
@@ -444,15 +404,7 @@ const ImagePlaygroundUI = () => {
       <div style={{ position: 'absolute', bottom: '30px', left: '50%', transform: 'translateX(-50%)', zIndex: 100 }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
           <button
-            onClick={() => {
-              if (isListening) {
-                setIsListening(false);
-                if (recognitionRef.current) recognitionRef.current.stop();
-              } else {
-                setIsListening(true);
-                if (recognitionRef.current) recognitionRef.current.start();
-              }
-            }}
+            onClick={handleMicClick}
             style={{
               width: '64px',
               height: '64px',
@@ -499,7 +451,7 @@ const ImagePlaygroundUI = () => {
           </div>
 
           <p style={{ height: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>
-            {isListening ? 'Listening...' : 'Click to speak'}
+            {isPlayingAudio ? 'Remembering...' : isListening ? 'Listening...' : 'Click to speak'}
           </p>
         </div>
       </div>
