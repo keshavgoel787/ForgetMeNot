@@ -441,12 +441,7 @@ async def text_to_speech(request: TextToSpeechRequest):
         "name": "Hannah"
     }
 
-    Returns: JSON with audio URL
-    {
-        "url": "https://storage.googleapis.com/...",
-        "text": "Hi, how are you?",
-        "voice": "Hannah"
-    }
+    Returns: MP3 audio file
     """
 
     # Get voice mapping
@@ -473,31 +468,14 @@ async def text_to_speech(request: TextToSpeechRequest):
     try:
         audio_content = generate_speech_elevenlabs(request.text, voice_id)
 
-        # Upload to GCS
-        from google.cloud import storage
-        import time
-
-        bucket_name = os.getenv("GCS_BUCKET", "forgetmenot-videos")
-        client = storage.Client()
-        bucket = client.bucket(bucket_name)
-
-        # Create unique filename
-        timestamp = int(time.time() * 1000)
-        filename = f"tts_audio/{request.name}_{timestamp}.mp3"
-        blob = bucket.blob(filename)
-
-        # Upload audio
-        blob.upload_from_string(audio_content, content_type="audio/mpeg")
-
-        # Make public and get URL
-        blob.make_public()
-        public_url = blob.public_url
-
-        return {
-            "url": public_url,
-            "text": request.text,
-            "voice": request.name
-        }
+        # Return as streaming MP3
+        return StreamingResponse(
+            io.BytesIO(audio_content),
+            media_type="audio/mpeg",
+            headers={
+                "Content-Disposition": f"attachment; filename={request.name}_speech.mp3"
+            }
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
