@@ -1,0 +1,10 @@
+{
+  "person_1": "anna",
+  "person_2": "lisa",
+  "person_3": "john",
+  "person_4": "person_1,person_5",
+  "person_5": null,
+  "person_6": "sarah,sally",
+  "person_7": "",
+  "person_8": "mike"
+}

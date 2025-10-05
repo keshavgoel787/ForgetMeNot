@@ -13,9 +13,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-*.pyc
-*.pyo
-*.pyd
 
 # IDE
 .vscode/
@@ -29,14 +26,9 @@ Thumbs.db
 
 # Temporary files
 temp_frames_*/
-temp_processing/
 temp_audio_extraction/
-temp_*
 *.tmp
 *.zip
-
-# Logs
-*.log
 
 # Data directories (photos, videos, processed data)
 pre_processed/
@@ -58,16 +50,3 @@ memories/
 *.mp3
 *.wav
 *.m4a
-
-# Processing script data
-processing_script/pre_processed/
-processing_script/post_processed/
-
-# API server data
-api_server/pre_processed/
-api_server/post_processed/
-api_server/temp_processing/
-
-# Google Cloud credentials (but allow package.json)
-*.json
-!package.json
