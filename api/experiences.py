@@ -156,7 +156,7 @@ async def create_experience(request: CreateExperienceRequest):
         # Insert into Snowflake (use TO_VARIANT for JSON data)
         insert_query = """
         INSERT INTO THERAPIST_EXPERIENCES (
-            experience_id, title, general_context, experience_data, total_memories, created_at
+            id, title, general_context, experience_data, total_memories, created_at
         )
         SELECT %s, %s, %s, PARSE_JSON(%s), %s, %s
         """
